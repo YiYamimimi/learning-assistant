@@ -1,36 +1,210 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Monorepo Project
+
+A modern monorepo with React frontend and Next.js backend.
+
+## Project Structure
+
+```
+.
+├── apps/
+│   ├── frontend/          # React 19 + Vite + CRXJS + Tailwind CSS
+│   └── backend/           # Next.js 15 + Supabase + OpenAI + Turbopack
+├── packages/
+│   └── shared/            # Shared TypeScript types and utilities
+├── .husky/                # Git hooks
+├── package.json           # Root package.json
+└── pnpm-workspace.yaml    # PNPM workspace configuration
+```
+
+## Tech Stack
+
+### Frontend
+
+- React 19
+- Vite
+- CRXJS (Chrome Extension)
+- Tailwind CSS
+- TypeScript
+
+### Backend
+
+- Next.js 15
+- Turbopack
+- Supabase
+- OpenAI
+- TypeScript
+
+### Development Tools
+
+- PNPM (Package Manager)
+- ESLint (with no-console rule)
+- Prettier
+- Husky (Git hooks)
+- Commitlint (Commit message linting)
+- Lint-staged
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js >= 18.0.0
+- PNPM >= 8.0.0
+
+### Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Install dependencies
+pnpm install
+
+# Setup environment variables for backend
+cp apps/backend/.env.example apps/backend/.env.local
+# Edit apps/backend/.env.local with your credentials
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Start all applications
+pnpm dev
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Start specific application
+pnpm --filter frontend dev
+pnpm --filter backend dev
+```
 
-## Learn More
+### Build
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Build all applications
+pnpm build
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Build specific application
+pnpm --filter frontend build
+pnpm --filter backend build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Linting & Formatting
 
-## Deploy on Vercel
+```bash
+# Lint all applications
+pnpm lint
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Format all files
+pnpm format
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Type check
+pnpm typecheck
+```
+
+## Git Hooks
+
+This project uses Husky for Git hooks:
+
+- **pre-commit**: Runs lint-staged to lint and format staged files
+- **commit-msg**: Validates commit messages using Commitlint
+
+## Commit Message Convention
+
+Follow the conventional commit format with required scope:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**⚠️ Important: Scope is required!**
+
+### Types
+
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `perf`: Performance improvements
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks
+- `build`: Build system changes
+- `ci`: CI/CD changes
+
+### Scopes (Required)
+
+- `frontend`: Changes to the frontend app (React + Vite + CRXJS)
+- `backend`: Changes to the backend app (Next.js + Supabase + OpenAI)
+- `shared`: Changes to shared packages
+- `monorepo`: Changes to monorepo configuration (root level)
+- `deps`: Dependency updates
+- `config`: Configuration changes
+
+### Examples
+
+```
+feat(frontend): add user login component
+
+Implement login form with email/password authentication.
+Add error handling and loading states.
+
+Closes #123
+```
+
+```
+fix(backend): resolve API authentication issue
+
+Fix JWT token validation in authentication middleware.
+Users were unable to login with valid credentials.
+
+Fixes #456
+```
+
+```
+style(frontend): improve button component styling
+
+Update button styles to match new design system.
+Use consistent colors and spacing.
+```
+
+```
+chore(deps): upgrade React to version 19
+
+Update all React-related packages to latest version.
+Test compatibility with existing components.
+```
+
+```
+refactor(backend): optimize database queries
+
+Improve query performance by adding indexes.
+Reduce response time by 40%.
+```
+
+## Code Quality
+
+- ESLint is configured to disallow `console.log()` statements
+- Prettier is configured for consistent code formatting
+- TypeScript strict mode is enabled
+- All files are automatically linted and formatted on commit
+
+## Environment Variables
+
+### Backend (.env.local)
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+## API Endpoints
+
+### Backend API
+
+- `GET /api/items` - Fetch items from Supabase
+- `POST /api/items` - Create a new item
+- `POST /api/chat` - Chat with OpenAI
+
+## License
+
+MIT
