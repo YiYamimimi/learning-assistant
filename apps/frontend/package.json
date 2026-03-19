@@ -13,10 +13,12 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "shared": "workspace:*"
+    "shared": "workspace:*",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.0.0-beta.23",
+    "@types/chrome": "^0.1.38",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "@typescript-eslint/eslint-plugin": "^8.15.0",

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试接口拦截</title>
+</head>
+<body>
+    <h1>测试接口拦截</h1>
+    <button id="testFetch">测试 Fetch 请求</button>
+    <button id="testXHR">测试 XHR 请求</button>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('testFetch').addEventListener('click', async () => {
+            try {
+                const response = await fetch('https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod/test');
+                const data = await response.json();
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                console.log('Fetch 响应:', data);
+            } catch (error) {
+                console.error('Fetch 错误:', error);
+                document.getElementById('result').innerHTML = '<p>Fetch 错误: ' + error.message + '</p>';
+            }
+        });
+
+        document.getElementById('testXHR').addEventListener('click', () => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod/test');
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                    console.log('XHR 响应:', data);
+                }
+            };
+            xhr.onerror = function() {
+                console.error('XHR 错误:', xhr.statusText);
+                document.getElementById('result').innerHTML = '<p>XHR 错误: ' + xhr.statusText + '</p>';
+            };
+            xhr.send();
+        });
+    </script>
+</body>
+</html>
