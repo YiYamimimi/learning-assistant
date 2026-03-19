@@ -38,6 +38,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       url: message.url,
       body: interceptedResponseData || 'No data intercepted',
     });
+  } else if (message.type === 'SEEK_TO_TIME') {
+    console.log('收到跳转请求，跳转到:', message.time);
+
+    const video = document.querySelector('video');
+    if (video) {
+      video.currentTime = message.time;
+      video.play();
+      sendResponse({ success: true, message: '已跳转到指定时间' });
+    } else {
+      sendResponse({ success: false, message: '未找到视频元素' });
+    }
   }
 
   return true;

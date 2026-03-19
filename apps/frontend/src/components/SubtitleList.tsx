@@ -5,6 +5,19 @@ interface SubtitleListProps {
 }
 
 export function SubtitleList({ subtitles }: SubtitleListProps) {
+  const handleTimeClick = (startTimeMs: number) => {
+    console.log('点击时间戳，跳转到:', startTimeMs);
+
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'SEEK_TO_TIME',
+          time: startTimeMs,
+        });
+      }
+    });
+  };
+
   return (
     <div className="space-y-3">
       {subtitles.length === 0 ? (
@@ -15,7 +28,11 @@ export function SubtitleList({ subtitles }: SubtitleListProps) {
             key={subtitle.id}
             className="flex items-start gap-4 p-2 hover:bg-gray-50 rounded transition-colors"
           >
-            <span className="text-sm font-mono text-purple-600 font-semibold whitespace-nowrap">
+            <span
+              className="text-sm font-mono text-purple-600 font-semibold whitespace-nowrap cursor-pointer hover:text-purple-800 transition-colors"
+              onClick={() => handleTimeClick(subtitle.duration)}
+              title={`跳转到 ${subtitle.startTime}`}
+            >
               {subtitle.startTime}
             </span>
             <p className="text-sm text-gray-800 leading-relaxed flex-1">{subtitle.content}</p>

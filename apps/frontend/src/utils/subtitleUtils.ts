@@ -39,7 +39,7 @@ export function processSubtitles(subtitles: SubtitleItem[]): ProcessedSubtitle[]
     id: `subtitle-${index}`,
     startTime: formatTime(subtitle.from),
     endTime: formatTime(subtitle.to),
-    duration: subtitle.to - subtitle.from,
+    duration: subtitle.from,
     content: subtitle.content,
     lang: subtitle.lang,
   }));
