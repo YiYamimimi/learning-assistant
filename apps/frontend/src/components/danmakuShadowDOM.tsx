@@ -54,23 +54,37 @@ function DanmakuPanel() {
           }
         }
 
-        // console.log('解析后的字幕数组:', items);
         setSubtitleItems(items);
       });
     };
 
     loadSubtitles();
 
+    let debounceTimer: any;
+
     const handleStorageChange = (changes: any, namespace: string) => {
       if (namespace === 'local' && changes.subtitleData) {
+        const newData = JSON.stringify(changes.subtitleData.newValue);
+        const oldData = JSON.stringify(changes.subtitleData.oldValue);
+
+        if (newData === oldData) {
+          console.log('字幕数据未变化，跳过重新加载');
+          return;
+        }
+
         console.log('字幕数据已更新，重新加载');
-        loadSubtitles();
+
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          loadSubtitles();
+        }, 300);
       }
     };
 
     chrome.storage.onChanged.addListener(handleStorageChange);
 
     return () => {
+      clearTimeout(debounceTimer);
       chrome.storage.onChanged.removeListener(handleStorageChange);
     };
   }, []);
@@ -109,53 +123,134 @@ function DanmakuPanel() {
 }
 
 let existingShadowHost: any | null = null;
+let isPanelCreated = false;
+
+const waitForElement = (selector: string, timeout = 10000): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    const element = document.querySelector(selector);
+    if (element) {
+      resolve(element);
+      return;
+    }
+
+    const observer: any = new (window as any).MutationObserver(() => {
+      const element = document.querySelector(selector);
+      if (element) {
+        observer.disconnect();
+        resolve(element);
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    setTimeout(() => {
+      observer.disconnect();
+      reject(new Error(`Timeout waiting for element: ${selector}`));
+    }, timeout);
+  });
+};
+
+const waitForPageStable = (timeout = 3000): Promise<void> => {
+  return new Promise((resolve) => {
+    let timer: any;
+    let lastMutationTime = Date.now();
+
+    const observer: any = new (window as any).MutationObserver(() => {
+      lastMutationTime = Date.now();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    timer = setInterval(() => {
+      const timeSinceLastMutation = Date.now() - lastMutationTime;
+      if (timeSinceLastMutation > 500) {
+        clearInterval(timer);
+        observer.disconnect();
+        console.log('页面已稳定，准备插入 Shadow DOM');
+        resolve();
+      }
+    }, 100);
+
+    setTimeout(() => {
+      clearInterval(timer);
+      observer.disconnect();
+      console.log('等待页面稳定超时，直接插入 Shadow DOM');
+      resolve();
+    }, timeout);
+  });
+};
 
 export function createDanmakuPanel() {
-  const danmukuBox = document.querySelector('.danmaku-box');
-  const danmakuWrap = document.querySelector('.danmaku-wrap');
-
-  if (!danmukuBox) {
-    console.log('未找到 .danmaku-box 元素');
+  if (isPanelCreated) {
+    console.log('弹幕面板已在创建中，跳过');
     return;
   }
 
-  if (!danmakuWrap) {
-    console.log('未找到 .danmaku-wrap 元素');
-    return;
-  }
+  isPanelCreated = true;
 
-  if (existingShadowHost && document.body.contains(existingShadowHost)) {
-    console.log('弹幕面板已存在，跳过创建');
-    return {
-      shadowHost: existingShadowHost,
-      shadowRoot: existingShadowHost.shadowRoot,
-      updateSubtitle: () => {
-        console.warn('更新字幕功能在已存在实例中不可用');
-      },
-    };
-  }
+  const createPanel = async () => {
+    try {
+      console.log('开始等待页面元素加载...');
+      await waitForElement('.danmaku-box', 10000);
+      await waitForElement('.danmaku-wrap', 10000);
 
-  const danmakuWrapRect = danmakuWrap.getBoundingClientRect();
-  const danmukuBoxRect = danmukuBox.getBoundingClientRect();
+      const danmukuBox = document.querySelector('.danmaku-box');
+      const danmakuWrap = document.querySelector('.danmaku-wrap');
 
-  const shadowHost = document.createElement('div');
-  shadowHost.id = 'danmaku-shadow-host';
-  shadowHost.setAttribute('data-extension', 'learning-assistant');
+      if (!danmukuBox) {
+        console.log('未找到 .danmaku-box 元素');
+        isPanelCreated = false;
+        return;
+      }
 
-  Object.assign(shadowHost.style, {
-    // position: 'absolute',
-    top: `${danmakuWrapRect.top - danmukuBoxRect.top - 410}px`,
-    left: `${danmakuWrapRect.left - danmukuBoxRect.left}px`,
-    width: `${danmakuWrapRect.width}px`,
-    maxHeight: '420px',
-    zIndex: '9999',
-    marginBottom: '20px',
-  });
+      if (!danmakuWrap) {
+        console.log('未找到 .danmaku-wrap 元素');
+        isPanelCreated = false;
+        return;
+      }
 
-  const shadowRoot = shadowHost.attachShadow({ mode: 'open' });
+      if (existingShadowHost && document.body.contains(existingShadowHost)) {
+        console.log('弹幕面板已存在，跳过创建');
+        isPanelCreated = false;
+        return {
+          shadowHost: existingShadowHost,
+          shadowRoot: existingShadowHost.shadowRoot,
+          updateSubtitle: () => {
+            console.warn('更新字幕功能在已存在实例中不可用');
+          },
+        };
+      }
 
-  const style = document.createElement('style');
-  style.textContent = `
+      console.log('等待页面稳定...');
+      await waitForPageStable(3000);
+
+      const danmakuWrapRect = danmakuWrap.getBoundingClientRect();
+
+      const shadowHost = document.createElement('div');
+      shadowHost.id = 'danmaku-shadow-host';
+      shadowHost.setAttribute('data-extension', 'learning-assistant');
+
+      Object.assign(shadowHost.style, {
+        position: 'relative',
+        top: '0',
+        left: '0',
+        width: `${danmakuWrapRect.width}px`,
+        maxHeight: '420px',
+        zIndex: '9999',
+        marginBottom: '20px',
+        visibility: 'hidden',
+      });
+
+      const shadowRoot = shadowHost.attachShadow({ mode: 'open' });
+
+      const style = document.createElement('style');
+      style.textContent = `
     :host {
       display: block;
       width: 100%;
@@ -293,38 +388,60 @@ export function createDanmakuPanel() {
     }
   `;
 
-  const reactRoot = document.createElement('div');
-  reactRoot.id = 'react-root';
+      const reactRoot = document.createElement('div');
+      reactRoot.id = 'react-root';
 
-  shadowRoot.appendChild(style);
-  shadowRoot.appendChild(reactRoot);
+      shadowRoot.appendChild(style);
+      shadowRoot.appendChild(reactRoot);
 
-  danmukuBox.insertBefore(shadowHost, danmakuWrap);
-
-  existingShadowHost = shadowHost;
-
-  const root = ReactDOM.createRoot(reactRoot);
-
-  root.render(<DanmakuPanel />);
-
-  setTimeout(() => {
-    if (shadowHost && document.body.contains(shadowHost)) {
-      shadowHost.style.visibility = 'visible';
-    } else {
-      console.warn('shadowHost 不存在，无法设置可见性');
-    }
-  }, 100);
-
-  return {
-    shadowHost,
-    shadowRoot,
-    updateSubtitle: (subtitles: SubtitleItem[]) => {
       try {
-        const processed = processSubtitles(subtitles);
-        root.render(<SubtitleList subtitles={processed} />);
+        danmakuWrap.insertAdjacentElement('beforebegin', shadowHost);
       } catch (error) {
-        console.error('更新字幕失败:', error);
+        console.error('插入 shadowHost 失败，尝试使用 appendChild:', error);
+        try {
+          danmukuBox.appendChild(shadowHost);
+        } catch (error2) {
+          console.error('使用 appendChild 也失败:', error2);
+          isPanelCreated = false;
+          return;
+        }
       }
-    },
+
+      existingShadowHost = shadowHost;
+
+      const root = ReactDOM.createRoot(reactRoot);
+
+      root.render(<DanmakuPanel />);
+
+      setTimeout(() => {
+        if (shadowHost && document.body.contains(shadowHost)) {
+          try {
+            shadowHost.style.visibility = 'visible';
+          } catch (error) {
+            console.error('设置可见性失败:', error);
+          }
+        } else {
+          console.warn('shadowHost 不存在，无法设置可见性');
+        }
+      }, 100);
+
+      return {
+        shadowHost,
+        shadowRoot,
+        updateSubtitle: (subtitles: SubtitleItem[]) => {
+          try {
+            const processed = processSubtitles(subtitles);
+            root.render(<SubtitleList subtitles={processed} />);
+          } catch (error) {
+            console.error('更新字幕失败:', error);
+          }
+        },
+      };
+    } catch (error) {
+      console.error('创建弹幕面板失败:', error);
+      isPanelCreated = false;
+    }
   };
+
+  createPanel();
 }
