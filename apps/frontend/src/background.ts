@@ -41,7 +41,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('收到字幕数据:', message.url);
     console.log('字幕内容:', JSON.stringify(message.body, null, 2));
 
-    // 将字幕数据存储到 chrome.storage 中，以便后续使用
     chrome.storage.local.set(
       {
         subtitleData: message.body,
@@ -54,13 +53,91 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     );
 
     sendResponse({ received: true, success: true });
+  } else if (message.type === 'REQUEST_SUBTITLE_DATA') {
+    console.log('收到主动请求字幕数据的消息:', message);
+
+    if (message.bvid) {
+      fetchSubtitleDataByBvid(message.bvid, sender.tab?.id || -1)
+        .then((result) => {
+          sendResponse({ success: true, data: result });
+        })
+        .catch((error) => {
+          console.error('主动请求字幕数据失败:', error);
+          sendResponse({ success: false, error: error.message });
+        });
+      return true;
+    } else {
+      sendResponse({ success: false, error: '缺少 bvid 参数' });
+    }
   } else {
     console.log('收到其他类型消息:', message.type);
     sendResponse({ received: true });
   }
 
-  return true; // 保持消息通道打开，用于异步响应
+  return true;
 });
+
+const fetchSubtitleDataByBvid = async (bvid: string, tabId: number) => {
+  console.log('开始主动请求字幕数据，bvid:', bvid);
+
+  try {
+    const wbiUrl = `https://api.bilibili.com/x/player/wbi/v2?bvid=${bvid}`;
+    console.log('请求 wbi/v2 接口:', wbiUrl);
+
+    const response = await fetch(wbiUrl);
+    const text = await response.text();
+    const data = JSON.parse(text);
+
+    console.log('成功解析 wbi/v2 数据:', data);
+
+    if (data.data && data.data.subtitle && data.data.subtitle.subtitles) {
+      const aiSubtitle = data.data.subtitle.subtitles.find((i: any) => i.lan === 'ai-zh');
+
+      if (aiSubtitle && aiSubtitle.subtitle_url) {
+        console.log('找到 AI 中文字幕 URL:', aiSubtitle.subtitle_url);
+        const url = `https:${aiSubtitle.subtitle_url}`;
+        chrome.storage.local.set({
+          aiSubtitleUrl: url,
+          timestamp: Date.now(),
+        });
+
+        const subtitleResponse = await fetch(url);
+        const subtitleText = await subtitleResponse.text();
+        const subtitleData = JSON.parse(subtitleText);
+
+        const finalData = subtitleData.body || subtitleData;
+
+        chrome.storage.local.set(
+          {
+            subtitleData: finalData,
+            subtitleUrl: url,
+            timestamp: Date.now(),
+          },
+          () => {
+            console.log('字幕数据已存储到 chrome.storage');
+          }
+        );
+
+        if (tabId > 0) {
+          chrome.tabs.sendMessage(tabId, {
+            type: 'SUBTITLE_DATA',
+            url: url,
+            body: subtitleData,
+          });
+        }
+
+        return finalData;
+      } else {
+        throw new Error('未找到 ai-zh 字幕');
+      }
+    } else {
+      throw new Error('wbi/v2 响应中没有字幕信息');
+    }
+  } catch (error) {
+    console.error('主动请求字幕数据失败:', error);
+    throw error;
+  }
+};
 
 chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
@@ -70,7 +147,7 @@ chrome.webRequest.onBeforeRequest.addListener(
     return {};
   },
   {
-    urls: ['*://aisubtitle.hdslb.com/*'],
+    urls: ['*:*'],
   },
   ['blocking']
 );
@@ -78,69 +155,91 @@ chrome.webRequest.onBeforeRequest.addListener(
 // 监听网络响应
 chrome.webRequest.onCompleted.addListener(
   (details) => {
-    if (details.url.includes('https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod')) {
-      console.log('收到字幕接口响应 (onCompleted):', details.url);
-      console.log('响应状态:', details.statusCode);
-      console.log('响应类型:', details.type);
-      console.log('响应时间:', details.timeStamp);
-      console.log('Tab ID:', details.tabId);
-      console.log('请求方法:', details.method);
-      console.log('响应头:', details.responseHeaders);
+    const fetchSubtitleData = async (subtitleUrl: string, tabId: number) => {
+      console.log('开始获取字幕数据:', subtitleUrl);
 
-      // 获取响应数据
+      try {
+        const response = await fetch(subtitleUrl);
+        const text = await response.text();
+        console.log('成功获取字幕文本，长度:', text.length);
+
+        try {
+          const data = JSON.parse(text);
+          console.log('成功解析字幕数据');
+
+          const subtitleData = data.body || data;
+
+          chrome.storage.local.set(
+            {
+              subtitleData: subtitleData,
+              subtitleUrl: subtitleUrl,
+              timestamp: Date.now(),
+            },
+            () => {
+              console.log('字幕数据已存储到 chrome.storage');
+            }
+          );
+
+          if (tabId > 0) {
+            chrome.tabs.sendMessage(tabId, {
+              type: 'SUBTITLE_DATA',
+              url: subtitleUrl,
+              body: data,
+            });
+          }
+        } catch (error) {
+          console.error('解析字幕数据失败:', error);
+        }
+      } catch (error) {
+        console.error('获取字幕数据失败:', error);
+      }
+    };
+
+    if (details.url.includes('https://api.bilibili.com/x/player/wbi/v2')) {
+      console.log('拦截到 wbi/v2 接口响应:', details.url);
+
       if (details.tabId > 0) {
-        console.log('准备获取响应体...');
-
-        // 使用 fetch 获取响应体
         fetch(details.url)
-          .then((response) => {
-            console.log('Fetch 响应状态:', response.status);
-            console.log('Fetch 响应类型:', response.type);
-            return response.text();
-          })
+          .then((response) => response.text())
           .then((text) => {
-            console.log('成功获取响应文本，长度:', text.length);
-            console.log('响应文本前100字符:', text.substring(0, 100));
-
             try {
               const data = JSON.parse(text);
-              console.log('成功解析字幕数据:', data);
+              console.log('成功解析 wbi/v2 数据:', data);
 
-              const subtitleData = data.body || data;
+              if (data.data && data.data.subtitle && data.data.subtitle.subtitles) {
+                const aiSubtitle = data.data.subtitle.subtitles.find((i: any) => i.lan === 'ai-zh');
 
-              // 将字幕数据存储到 chrome.storage 中
-              chrome.storage.local.set(
-                {
-                  subtitleData: subtitleData,
-                  subtitleUrl: details.url,
-                  timestamp: Date.now(),
-                },
-                () => {
-                  console.log('字幕数据已存储到 chrome.storage');
+                if (aiSubtitle && aiSubtitle.subtitle_url) {
+                  const url = `https:${aiSubtitle.subtitle_url}`;
+                  console.log('找到 AI 中文字幕 url:', url);
+
+                  chrome.storage.local.set({
+                    aiSubtitleUrl: url,
+                    timestamp: Date.now(),
+                  });
+
+                  fetchSubtitleData(url, details.tabId);
+                } else {
+                  console.log('未找到 ai-zh 字幕');
                 }
-              );
-
-              // 通知 content script
-              chrome.tabs.sendMessage(details.tabId, {
-                type: 'SUBTITLE_DATA',
-                url: details.url,
-                body: data,
-              });
+              }
             } catch (error) {
-              console.error('解析响应数据失败:', error);
-              console.log('响应文本:', text);
+              console.error('解析 wbi/v2 响应失败:', error);
             }
           })
           .catch((error) => {
-            console.error('获取响应体失败:', error);
+            console.error('获取 wbi/v2 响应失败:', error);
           });
-      } else {
-        console.log('Tab ID 无效，无法获取响应体');
       }
+    }
+
+    if (details.url.includes('https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod')) {
+      console.log('拦截到字幕文件响应:', details.url);
+      fetchSubtitleData(details.url, details.tabId);
     }
   },
   {
-    urls: ['*://aisubtitle.hdslb.com/*'],
+    urls: ['*://api.bilibili.com/*', '*://aisubtitle.hdslb.com/*'],
   }
 );
 

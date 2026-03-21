@@ -1,6 +1,6 @@
 // content.ts
 // 实现接口拦截逻辑
-
+import { createDanmakuPanel } from './components/danmakuShadowDOM';
 console.log('Content script 开始加载...');
 console.log('当前页面 URL:', window.location.href);
 
@@ -52,6 +52,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   return true;
+});
+
+// 监听来自影子DOM的消息
+window.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SEEK_TO_TIME') {
+    console.log('收到来自影子DOM的跳转请求:', event.data.time);
+
+    const video = document.querySelector('video');
+    if (video) {
+      video.currentTime = event.data.time;
+      video.play();
+    } else {
+      console.error('未找到视频元素');
+    }
+  }
 });
 
 // 重写 fetch 方法以拦截特定接口
@@ -242,7 +257,8 @@ console.log(
   XMLHttpRequest.prototype.open !== originalXHROpen
 );
 
-// 导出 onExecute 函数，供 content.ts-loader.js 调用
+createDanmakuPanel();
+
 const onExecute = (params?: any) => {
   console.log('Content script executed', params);
   console.log('拦截器已设置完成');

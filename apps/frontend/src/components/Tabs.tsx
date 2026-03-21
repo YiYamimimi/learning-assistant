@@ -14,8 +14,11 @@ interface TabsProps {
 
 export function Tabs({ tabs, activeTab, onTabChange }: TabsProps) {
   return (
-    <div className="flex flex-col h-full">
-      <div role="tablist" className="flex border-b border-gray-200">
+    <div className="w-full">
+      <div
+        role="tablist"
+        className="relative flex items-center bg-gray-100/80 rounded-xl p-1.5 gap-1"
+      >
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -24,21 +27,24 @@ export function Tabs({ tabs, activeTab, onTabChange }: TabsProps) {
             aria-selected={activeTab === tab.id}
             aria-controls={`tab-panel-${tab.id}`}
             className={`
-              px-4 py-2 text-sm font-medium transition-colors relative
-              ${activeTab === tab.id ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}
+              relative flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-250 ease-out
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50
+              border-none bg-transparent cursor-pointer appearance-none
+              ${
+                activeTab === tab.id
+                  ? 'text-gray-900 bg-white shadow-md'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+              }
             `}
           >
             {tab.label}
-            {activeTab === tab.id && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
-            )}
           </button>
         ))}
       </div>
       <div
         id={`tab-panel-${tabs.find((tab) => tab.id === activeTab)?.id}`}
         role="tabpanel"
-        className="flex-1 overflow-auto"
+        className="mt-4"
       >
         {tabs.find((tab) => tab.id === activeTab)?.content}
       </div>
