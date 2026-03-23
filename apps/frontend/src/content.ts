@@ -75,72 +75,69 @@ const originalFetch = window.fetch;
 window.fetch = async (url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const urlString = typeof url === 'string' ? url : url.toString();
 
-  console.log('Fetch 请求:', urlString);
-
-  // 拦截特定接口
-  if (urlString.includes('https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod')) {
-    console.log('拦截到字幕接口请求:', urlString);
-
-    try {
-      // 1. 发送真实的请求
-      const res = await originalFetch(url, init);
-      console.log('收到响应:', res);
-
-      // 2. 克隆响应对象（因为响应对象只能被读取一次）
-      const clone = res.clone();
-      console.log('克隆完成，准备读取数据...');
-
-      // 3. 读取克隆的响应体
-      const myData = await clone.json();
-      console.log('插件拿到真实数据:', myData);
-
-      // 4. 存储拦截到的响应数据
-      interceptedResponseData = myData;
-
-      // 5. 发送响应数据到 background script
-      sendResponseToBackground(urlString, myData);
-
-      // 6. 返回原始响应
-      return res;
-    } catch (error) {
-      console.error('获取响应数据失败:', error);
-
-      // 如果出错，返回模拟数据
-      const mockSubtitleData = {
-        code: 0,
-        message: 'success',
-        data: {
-          subtitles: [
-            {
-              from: 0,
-              to: 3000,
-              content: '这是一段模拟的字幕内容',
-              lang: 'zh',
-            },
-            {
-              from: 3000,
-              to: 6000,
-              content: '这是第二段模拟的字幕内容',
-              lang: 'zh',
-            },
-          ],
-        },
-      };
-
-      interceptedResponseData = mockSubtitleData;
-      sendResponseToBackground(urlString, mockSubtitleData);
-
-      return new Response(JSON.stringify(mockSubtitleData), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-    }
+  // 只拦截字幕接口，其他请求（包括 OpenAI API）直接放行
+  if (!urlString.includes('https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod')) {
+    return originalFetch(url, init);
   }
 
-  // 其他请求正常处理
-  return originalFetch(url, init);
+  console.log('拦截到字幕接口请求:', urlString);
+
+  try {
+    // 1. 发送真实的请求
+    const res = await originalFetch(url, init);
+    console.log('收到响应:', res);
+
+    // 2. 克隆响应对象（因为响应对象只能被读取一次）
+    const clone = res.clone();
+    console.log('克隆完成，准备读取数据...');
+
+    // 3. 读取克隆的响应体
+    const myData = await clone.json();
+    console.log('插件拿到真实数据:', myData);
+
+    // 4. 存储拦截到的响应数据
+    interceptedResponseData = myData;
+
+    // 5. 发送响应数据到 background script
+    sendResponseToBackground(urlString, myData);
+
+    // 6. 返回原始响应
+    return res;
+  } catch (error) {
+    console.error('获取响应数据失败:', error);
+
+    // 如果出错，返回模拟数据
+    const mockSubtitleData = {
+      code: 0,
+      message: 'success',
+      data: {
+        subtitles: [
+          {
+            from: 0,
+            to: 3000,
+            content: '这是一段模拟的字幕内容',
+            lang: 'zh',
+          },
+          {
+            from: 3000,
+            to: 6000,
+            content: '这是第二段模拟的字幕内容',
+            lang: 'zh',
+          },
+        ],
+      },
+    };
+
+    interceptedResponseData = mockSubtitleData;
+    sendResponseToBackground(urlString, mockSubtitleData);
+
+    return new Response(JSON.stringify(mockSubtitleData), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
 };
 
 // 重写 XMLHttpRequest 以拦截特定接口
@@ -257,7 +254,16 @@ console.log(
   XMLHttpRequest.prototype.open !== originalXHROpen
 );
 
-createDanmakuPanel();
+// 等待 DOM 完全加载后再创建面板
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM 加载完成，创建弹幕面板');
+    createDanmakuPanel();
+  });
+} else {
+  console.log('DOM 已就绪，直接创建弹幕面板');
+  createDanmakuPanel();
+}
 
 const onExecute = (params?: any) => {
   console.log('Content script executed', params);

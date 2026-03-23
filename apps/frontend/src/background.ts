@@ -11,25 +11,26 @@ chrome.action.onClicked.addListener((tab) => {
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('Extension installed:', details);
 
-  // 自动打开侧边栏
-  chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+  // 注意：不能在非用户手势时自动打开侧边栏
+  // 用户需要手动点击扩展图标来打开侧边栏
 });
 
-// 监听浏览器启动事件，自动打开侧边栏
+// 监听浏览器启动事件
 chrome.runtime.onStartup.addListener(() => {
-  chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+  // 注意：不能在非用户手势时自动打开侧边栏
+  // 用户需要手动点击扩展图标来打开侧边栏
 });
 
-// 监听标签页更新事件，确保侧边栏保持打开
-chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url) {
-    chrome.sidePanel.open({ windowId: tab.windowId });
-  }
+// 监听标签页更新事件
+chrome.tabs.onUpdated.addListener((_tabId) => {
+  // 注意：不能在非用户手势时自动打开侧边栏
+  // 用户需要手动点击扩展图标来打开侧边栏
 });
 
-// 监听标签页激活事件，确保侧边栏保持打开
-chrome.tabs.onActivated.addListener((activeInfo) => {
-  chrome.sidePanel.open({ windowId: activeInfo.windowId });
+// 监听标签页激活事件
+chrome.tabs.onActivated.addListener(() => {
+  // 注意：不能在非用户手势时自动打开侧边栏
+  // 用户需要手动点击扩展图标来打开侧边栏
 });
 
 // 监听来自 content script 的消息
@@ -53,6 +54,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     );
 
     sendResponse({ received: true, success: true });
+    return false;
   } else if (message.type === 'REQUEST_SUBTITLE_DATA') {
     console.log('收到主动请求字幕数据的消息:', message);
 
@@ -68,13 +70,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     } else {
       sendResponse({ success: false, error: '缺少 bvid 参数' });
+      return false;
     }
+  } else if (message.type === 'JUMP_TO_TIME') {
+    console.log('收到跳转时间请求:', message.time);
+
+    // 获取当前活动标签页
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0] && tabs[0].id) {
+        console.log('发送跳转指令到标签页:', tabs[0].id);
+        chrome.tabs.sendMessage(
+          tabs[0].id,
+          {
+            type: 'SEEK_TO_TIME',
+            time: message.time,
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.error('发送跳转指令失败:', chrome.runtime.lastError.message);
+              sendResponse({ success: false, error: chrome.runtime.lastError.message });
+            } else {
+              console.log('跳转指令发送成功:', response);
+              sendResponse({ success: true, response });
+            }
+          }
+        );
+      } else {
+        console.error('未找到活动标签页');
+        sendResponse({ success: false, error: '未找到活动标签页' });
+      }
+    });
+    return true;
   } else {
     console.log('收到其他类型消息:', message.type);
     sendResponse({ received: true });
+    return false;
   }
-
-  return true;
 });
 
 const fetchSubtitleDataByBvid = async (bvid: string, tabId: number) => {
@@ -130,11 +161,24 @@ const fetchSubtitleDataByBvid = async (bvid: string, tabId: number) => {
         );
 
         if (tabId > 0) {
-          chrome.tabs.sendMessage(tabId, {
-            type: 'SUBTITLE_DATA',
-            url: url,
-            body: subtitleData,
-          });
+          chrome.tabs.sendMessage(
+            tabId,
+            {
+              type: 'SUBTITLE_DATA',
+              url: url,
+              body: subtitleData,
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                console.log(
+                  '发送消息到 content script 失败（可能未加载）:',
+                  chrome.runtime.lastError.message
+                );
+              } else {
+                console.log('成功发送消息到 content script:', response);
+              }
+            }
+          );
         }
 
         return finalData;
@@ -155,12 +199,10 @@ chrome.webRequest.onBeforeRequest.addListener(
     if (details.url.includes('https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod')) {
       console.log('拦截到字幕接口请求 (background):', details.url);
     }
-    return {};
   },
   {
-    urls: ['*:*'],
-  },
-  ['blocking']
+    urls: ['<all_urls>'],
+  }
 );
 
 // 监听网络响应
@@ -213,11 +255,24 @@ chrome.webRequest.onCompleted.addListener(
           );
 
           if (tabId > 0) {
-            chrome.tabs.sendMessage(tabId, {
-              type: 'SUBTITLE_DATA',
-              url: subtitleUrl,
-              body: data,
-            });
+            chrome.tabs.sendMessage(
+              tabId,
+              {
+                type: 'SUBTITLE_DATA',
+                url: subtitleUrl,
+                body: data,
+              },
+              (response) => {
+                if (chrome.runtime.lastError) {
+                  console.log(
+                    '发送消息到 content script 失败（可能未加载）:',
+                    chrome.runtime.lastError.message
+                  );
+                } else {
+                  console.log('成功发送消息到 content script:', response);
+                }
+              }
+            );
           }
         } catch (error) {
           console.error('解析字幕数据失败:', error);

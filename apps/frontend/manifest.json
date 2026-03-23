@@ -3,14 +3,7 @@
   "name": "My Extension",
   "version": "1.0.0",
   "description": "A Chrome extension built with React and Vite",
-  "permissions": [
-    "sidePanel",
-    "tabs",
-    "webRequest",
-    "webRequestBlocking",
-    "storage",
-    "https://*/*"
-  ],
+  "permissions": ["sidePanel", "tabs", "webRequest", "storage", "https://*/*"],
   "host_permissions": ["*://*/*"],
   "content_scripts": [
     {
