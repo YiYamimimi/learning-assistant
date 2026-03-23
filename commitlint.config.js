@@ -18,9 +18,8 @@ export default {
         'ci',
       ],
     ],
-    'scope-enum': [2, 'always', ['frontend', 'backend', 'shared', 'monorepo', 'deps', 'config']],
     'scope-case': [2, 'always', 'lower-case'],
-    'scope-empty': [2, 'never'],
+    'scope-empty': [0],
     'subject-case': [0],
   },
 };
