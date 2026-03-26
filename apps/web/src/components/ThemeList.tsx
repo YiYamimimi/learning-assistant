@@ -1,0 +1,217 @@
+import { useState, useEffect } from 'react';
+
+interface VideoTheme {
+  id: string;
+  title: string;
+  duration: number;
+  quote: {
+    text: string;
+    timestamp: string;
+  };
+  segments: Array<{
+    start: number;
+    end: number;
+    text: string;
+    confidence: number;
+  }>;
+}
+
+interface ThemeListProps {
+  currentTime: number;
+  videoDuration: number;
+  onSeekTime: (time: number) => void;
+}
+
+export default function ThemeList({ currentTime, videoDuration, onSeekTime }: ThemeListProps) {
+  const [themes, setThemes] = useState<VideoTheme[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalVideoTime, setTotalVideoTime] = useState(0);
+
+  useEffect(() => {
+    fetch('/example/topic.json')
+      .then((response) => response.json())
+      .then((data) => {
+        setThemes(data);
+        setIsLoading(false);
+
+        // Calculate total video time based on last theme's end time
+        const lastTheme = data[data.length - 1];
+        if (lastTheme && lastTheme.segments.length > 0) {
+          setTotalVideoTime(lastTheme.segments[lastTheme.segments.length - 1].end);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to fetch theme data:', error);
+        setIsLoading(false);
+      });
+  }, []);
+
+  const parseTimestamp = (timestamp: string): { start: number; end: number } => {
+    const match = timestamp.match(/\[(\d+):(\d+)-(\d+):(\d+)\]/);
+    if (match) {
+      const startMinutes = parseInt(match[1]);
+      const startSeconds = parseInt(match[2]);
+      const endMinutes = parseInt(match[3]);
+      const endSeconds = parseInt(match[4]);
+
+      return {
+        start: startMinutes * 60 + startSeconds,
+        end: endMinutes * 60 + endSeconds,
+      };
+    }
+    return { start: 0, end: 0 };
+  };
+
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleThemeClick = (startTime: number, quoteTimestamp: string) => {
+    console.log('Seek to theme start time:', startTime);
+    console.log('Quote timestamp:', quoteTimestamp);
+    onSeekTime(startTime);
+  };
+
+  const getDotColor = (index: number): string => {
+    const colors = [
+      '#a855f7', // 紫色
+      '#eab308', // 黄色
+      '#f97316', // 橙色
+      '#22c55e', // 绿色
+      '#ec4899', // 粉色
+    ];
+    return colors[index % colors.length];
+  };
+
+  const getBackgroundColor = (index: number): string => {
+    const colors = [
+      '#f3e8ff', // 浅紫背景
+      '#fef3c7', // 浅黄背景
+      '#fef2f2', // 浅橙背景
+      '#dcfce7', // 浅绿背景
+      '#fce7f3', // 浅粉背景
+    ];
+    return colors[index % colors.length];
+  };
+
+  const getProgressColor = (index: number): string => {
+    const colors = [
+      '#d8b4fe', // 浅紫色
+      '#fde68a', // 浅黄色
+      '#fdba74', // 浅橙色
+      '#a7f3d0', // 浅绿色
+      '#f9a8d4', // 浅粉色
+    ];
+    return colors[index % colors.length];
+  };
+
+  const generateTimeMarkers = (duration: number) => {
+    const markers: { time: number; label: string }[] = [];
+    const interval = 60; // 1 minute interval
+
+    for (let time = 0; time <= duration; time += interval) {
+      markers.push({
+        time,
+        label: formatTime(time),
+      });
+    }
+
+    return markers;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-sm text-gray-500">加载主题中...</div>
+      </div>
+    );
+  }
+
+  // Use video duration if available, otherwise fall back to calculated total time
+  const effectiveTotalTime = videoDuration > 0 ? videoDuration : totalVideoTime;
+  const timeMarkers = generateTimeMarkers(effectiveTotalTime);
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Time markers */}
+      <div className="relative h-6 mb-1">
+        {timeMarkers.map((marker, index) => (
+          <div
+            key={`marker-${index}`}
+            className="absolute top-0 transform -translate-x-1/2"
+            style={{ left: `${(marker.time / effectiveTotalTime) * 100}%` }}
+          >
+            <div className="text-xs text-gray-500 whitespace-nowrap">{marker.label}</div>
+            <div className="w-px h-2 bg-gray-300 mx-auto"></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Progress bar with theme colors */}
+      <div className="relative h-4 bg-gray-100 rounded-full mb-4 overflow-hidden">
+        {/* Play indicator - red vertical line */}
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10 transition-all duration-300"
+          style={{
+            left: `${(currentTime / effectiveTotalTime) * 100}%`,
+            transform: 'translateX(-50%)',
+          }}
+        ></div>
+
+        {/* Theme color blocks */}
+        {themes.map((theme, index) => {
+          const { start, end } = parseTimestamp(theme.quote.timestamp);
+          const duration = end - start;
+          const startPercent = effectiveTotalTime > 0 ? (start / effectiveTotalTime) * 100 : 0;
+          const widthPercent = effectiveTotalTime > 0 ? (duration / effectiveTotalTime) * 100 : 0;
+
+          return (
+            <div
+              key={`progress-${theme.id}`}
+              className="absolute top-0 bottom-0 rounded-full"
+              style={{
+                left: `${startPercent}%`,
+                width: `${widthPercent}%`,
+                backgroundColor: getProgressColor(index),
+                opacity: 0.8,
+              }}
+            ></div>
+          );
+        })}
+      </div>
+
+      {/* Theme list */}
+      <div className="flex-1 overflow-auto">
+        <div className="space-y-1">
+          {themes.map((theme, index) => {
+            const { start } = parseTimestamp(theme.quote.timestamp);
+
+            return (
+              <div
+                key={theme.id}
+                className="p-3 rounded-lg cursor-pointer hover:shadow-sm transition-shadow"
+                style={{ backgroundColor: getBackgroundColor(index) }}
+                onClick={() => handleThemeClick(start, theme.quote.timestamp)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div
+                      className="w-3 h-3 rounded-full mr-3"
+                      style={{ backgroundColor: getDotColor(index) }}
+                    ></div>
+                    <div className="flex-1">
+                      <div className="font-medium text-sm text-gray-900">{theme.title}</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-600">{formatTime(start)}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -7,9 +7,11 @@
   "scripts": {
     "dev": "pnpm --filter \"./apps/**\" dev",
     "dev:frontend": "pnpm --filter \"./apps/frontend\" dev",
+    "dev:web": "pnpm --filter \"./apps/web\" dev",
     "dev:backend": "pnpm --filter \"./apps/backend\" dev",
     "build": "pnpm --filter \"./apps/**\" build",
     "build:frontend": "pnpm --filter \"./apps/frontend\" build",
+    "build:web": "pnpm --filter \"./apps/web\" build",
     "build:backend": "pnpm --filter \"./apps/backend\" build",
     "preview": "pnpm --filter \"./apps/frontend\" preview",
     "start": "pnpm --filter \"./apps/backend\" start",

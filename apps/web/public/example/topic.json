@@ -1,0 +1,112 @@
+[
+  {
+    "id": "topic-0",
+    "quote": {
+      "text": "I think my big difference is that it actually runs on your computer. Like every everything I saw so far runs in the cloud. It's like it can do a few things if you run on your computer. It can do every effing thing, right? So that's way more powerful. >> Yeah. Machine can do anything that you can do with the machine. >> You can just connect to your oven or your Tesla or your lights, your Sonos. My bad. It can control the temperature of my bed. JPD can't do that. >> You gave it all the skills that you have yourself. A friend told me like he installed Open Claw and it and then it asked it like look through my computer and make a narrative over my last year and it made this incredibly good narrative and he was like how did you do that and then he the open cloth found audio files where like every Sunday he was recording stuff and openclaw found that but he didn't even remember about it because it was like more than a year ago right so So just by it being able to search a whole computer, it it can surprise you.",
+      "timestamp": "[01:36-02:53]"
+    },
+    "title": "Local AI Unlocks Total Machine Control",
+    "duration": 101,
+    "segments": [
+      {
+        "end": 180.63899999999998,
+        "text": "bad stuff. Um, but clearly I hit something that sprew up emotions and made people interested and inspired people and it's really cool. >> And a lot of people have been working on, you know, AI and even personal assistance. Like what what is it that assistance. Like what what is it that made Open Claw take off? >> I think my big difference is that it actually runs on your computer. Like every everything I saw so far runs in the cloud. It's like it can do a few the cloud. It's like it can do a few things if you run on your computer. It can do every effing thing, right? So that's way more powerful. >> Yeah. Machine can do anything that you can do with the machine. >> You can just connect to your oven or your Tesla or your lights, your Sonos. My bad. It can control the temperature of my bed. JPD can't do that. >> You gave it all the skills that you have yourself. A friend told me like he yourself. A friend told me like he installed Open Claw and it and then it asked it like look through my computer and make a narrative over my last year and it made this incredibly good narrative and he was like how did you do that and then he the open cloth found audio files where like every Sunday he was recording stuff and openclaw found that but he didn't even remember about it because it was like more than a year ago right so So just by it being able to search a whole computer, it it can surprise you. >> It's also you also give it all the data, right? So it can surprise you in many ways. >> And so now you have, you know, we're even moving from human tobot. So like",
+        "start": 79.2,
+        "confidence": 0.5,
+        "endCharOffset": 77,
+        "endSegmentIdx": 35,
+        "startCharOffset": 0,
+        "startSegmentIdx": 17,
+        "hasCompleteSentences": false
+      }
+    ]
+  },
+  {
+    "id": "topic-1",
+    "quote": {
+      "text": "And so now you have, you know, we're even moving from human tobot. So like interactions and you've been talking about tobottobot interactions or even like bot to other humans where you know bots on behalf of you are then hiring other humans to accomplish tasks IRL like what's happening >> I think that's a natural next step like okay I want to book a restaurant my bot will reach out to the restaurant bot and do the negotiation like because it's more efficient Or or maybe it's like an old restaurant. So my bot needs to actually get some some human work done so that the human then calls the restaurant because they don't like bots >> or walks there to stand in line >> if he doesn't get a robot for >> or the owner of the bot. >> And I imagine that like maybe if if I have even multiple bots like maybe I have like specialist one is like for my private life and one is for like my person my my work stuff. Maybe one is our relationship bot that gets like everything in between.",
+      "timestamp": "[02:56-04:03]"
+    },
+    "title": "Bots Hire Humans for Real-World Tasks",
+    "duration": 71,
+    "segments": [
+      {
+        "end": 243.44,
+        "text": "And so now you have, you know, we're even moving from human tobot. So like interactions and you've been talking about tobottobot interactions or even like bot to other humans where you know bots on behalf of you are then hiring other humans to accomplish tasks IRL like what's happening >> I think that's a natural next step like okay I want to book a restaurant my bot will reach out to the restaurant bot and do the negotiation like because it's more efficient Or or maybe it's like an old restaurant. So my bot needs to actually get some some human work done so that the human then calls the restaurant because they don't like bots >> or walks there to stand in line >> if he doesn't get a robot for >> or the owner of the bot. >> And I imagine that like maybe if if I have even multiple bots like maybe I have like specialist one is like for my private life and one is for like my person my my work stuff. Maybe one is our relationship bot that gets like everything in between.",
+        "start": 172.319,
+        "confidence": 1,
+        "endCharOffset": 58,
+        "endSegmentIdx": 42,
+        "startCharOffset": 3,
+        "startSegmentIdx": 35,
+        "hasCompleteSentences": true
+      }
+    ]
+  },
+  {
+    "id": "topic-2",
+    "quote": {
+      "text": "intelligence. I think that if you look at one human being, what can one human being actually achieve? Do you think one human being could make an iPhone or one human being could go to space? One human being would probably just like not even be able to like find food. Um, but as a group we specialize as a larger society we specialize even more. So, what can we learn from that that we can apply to AI? You know, we we already have like AI that specializes in certain things. Um, even though it's it's generalized intelligence, what if it actually is also specialized intelligence? So, I it's going to be very exciting, cool.",
+      "timestamp": "[04:19-05:18]"
+    },
+    "title": "Swarm Intelligence Trumps God AI",
+    "duration": 34,
+    "segments": [
+      {
+        "end": 305.91999999999996,
+        "text": "intelligence. I think that if you look at one human being, what can one human being actually achieve? Do you think one human being could make an iPhone or one human being could go to space? One human being would probably just like not even be able to like find food. Um, but as a group we specialize as a larger society we specialize even more. So, what can we learn from that that we can apply to AI? You know, we we already have like AI that specializes in certain things. Um, even though it's it's generalized intelligence, what if it actually is also specialized intelligence? So, I it's going to be very exciting, cool.",
+        "start": 271.919,
+        "confidence": 0.5609756097560976,
+        "endCharOffset": 43,
+        "endSegmentIdx": 53,
+        "startCharOffset": 0,
+        "startSegmentIdx": 49,
+        "hasCompleteSentences": false
+      }
+    ]
+  },
+  {
+    "id": "topic-3",
+    "quote": {
+      "text": "No, it you know turns out um because coding models got so good. Coding is really like creative problem solving that maps very well back into the real world. I think I think there there's a huge correlation. they need to be really good at creative problem solving and that's a skill that's an abstract skill you can apply to code but like to any real world task. So the the model had a oh surprise there's like a magical file. I don't know what it is. I need to solve this and it did its best and solved that. And it was even that clever that it it chose not to install the local whisper because it knows that that would require downloading a model which would take probably a few minutes and I'm like impatient, you know. So it it really took the most uh intelligent approach",
+      "timestamp": "[09:21-10:24]"
+    },
+    "title": "Coding Models Solve Unanticipated Problems",
+    "duration": 48,
+    "segments": [
+      {
+        "end": 615.519,
+        "text": "No, it you know turns out um because coding models got so good. Coding is really like creative problem solving that maps very well back into the real world. I think I think there there's a huge correlation. they need to be really good at creative problem solving and that's a skill that's an abstract skill you can apply to code but like to any real world task. So the the model had a oh surprise there's like a magical file. I don't know what it is. I need to solve this and it did its best and solved that. And it was even that clever that it it chose not to install the local whisper because it knows that that would require downloading a model which would take probably a few minutes and I'm like impatient, you know. So it it really took the most uh intelligent approach",
+        "start": 567.6,
+        "confidence": 0.4017857142857143,
+        "endCharOffset": 187,
+        "endSegmentIdx": 106,
+        "startCharOffset": 0,
+        "startSegmentIdx": 101,
+        "hasCompleteSentences": false
+      }
+    ]
+  },
+  {
+    "id": "topic-4",
+    "quote": {
+      "text": "even anticipate. You didn't build an app to do that exact thing, are apps just going to go away. >> Uh I think 80% of them are going away. Why do I need My Fitness Pal? Like my agent already knows that I'm making bad decisions. I'm at I don't know uh Smashburg or something and it will already assume that I eat what I like to eat. If I don't make a comment, it will just like automatically track it or I make a picture and it will just store it somewhere. I don't even need to care. Right. And then my maybe it it improves my my gym schedule like adds a little bit more cardio in it. I don't need my my fitness app because it just it just does the fitness planning for me. Uh why do I need a to-do app? I just tell it, hey, remind me of this and this and then next day it will just remind me of this and this. Do I care where it's stored? No, it just does its thing.",
+      "timestamp": "[10:34-11:47]"
+    },
+    "title": "80% of Apps Die to Agents",
+    "duration": 46,
+    "segments": [
+      {
+        "end": 690.48,
+        "text": "even anticipate. You didn't build an app to do that exact thing, are apps just going to go away. >> Uh I think 80% of them are going away. Why do I need My Fitness Pal? Like my agent already knows that I'm making bad decisions. I'm at I don't know uh Smashburg or something and it will already assume that I eat what I like to eat. If I don't make a comment, it will just like automatically track it or I make a picture and it will just store it somewhere. I don't even need to care. Right. And then my maybe it it improves my my gym schedule like adds a little bit more cardio in it. I don't need my my fitness app because it just it just does the fitness planning for me. Uh why do I need a to-do app? I just tell it, hey, remind me of this and this and then next day it will just remind me of this and this. Do I care where it's stored? No, it just does its thing.",
+        "start": 644.56,
+        "confidence": 0.3728813559322034,
+        "endCharOffset": 158,
+        "endSegmentIdx": 123,
+        "startCharOffset": 0,
+        "startSegmentIdx": 117,
+        "hasCompleteSentences": false
+      }
+    ]
+  }
+]
