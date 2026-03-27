@@ -1,6 +1,5 @@
 /* eslint-disable no-undef */
-import React, { useState, useRef, useEffect } from 'react';
-import { RelevantChunk } from '../services/rag';
+import { useState, useRef, useEffect } from 'react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -11,18 +10,11 @@ export function AIChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [relevantChunks, setRelevantChunks] = useState<RelevantChunk[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const formatTime = (ms: number): string => {
-    const minutes = Math.floor(ms / 60);
-    const seconds = Math.floor(ms % 60);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -31,7 +23,6 @@ export function AIChat() {
     setInput('');
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
-    setRelevantChunks([]);
 
     try {
       console.log('=== 侧边栏: 发送 RAG 查询请求 ===');
@@ -86,25 +77,6 @@ export function AIChat() {
             <div className="message-content">{msg.content}</div>
           </div>
         ))}
-
-        {relevantChunks.length > 0 && (
-          <div className="relevant-subtitles">
-            <div className="relevant-subtitles-header">📺 相关字幕</div>
-            <div className="relevant-subtitles-list">
-              {relevantChunks.map((chunk, index) => (
-                <div key={index} className="relevant-chunk">
-                  <div className="chunk-time">
-                    {formatTime(chunk.startTime)} - {formatTime(chunk.endTime)}
-                    <span className="similarity">
-                      (相似度: {(chunk.similarity * 100).toFixed(1)}%)
-                    </span>
-                  </div>
-                  <div className="chunk-content">{chunk.content}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {isLoading && (
           <div className="typing-indicator">

@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
+/* global HTMLDivElement */
 
 interface VideoTheme {
   id: string;
@@ -26,6 +28,8 @@ export default function ThemeList({ currentTime, videoDuration, onSeekTime }: Th
   const [themes, setThemes] = useState<VideoTheme[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalVideoTime, setTotalVideoTime] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch('/example/topic.json')
@@ -34,7 +38,6 @@ export default function ThemeList({ currentTime, videoDuration, onSeekTime }: Th
         setThemes(data);
         setIsLoading(false);
 
-        // Calculate total video time based on last theme's end time
         const lastTheme = data[data.length - 1];
         if (lastTheme && lastTheme.segments.length > 0) {
           setTotalVideoTime(lastTheme.segments[lastTheme.segments.length - 1].end);
@@ -44,6 +47,18 @@ export default function ThemeList({ currentTime, videoDuration, onSeekTime }: Th
         console.error('Failed to fetch theme data:', error);
         setIsLoading(false);
       });
+  }, []);
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
   }, []);
 
   const parseTimestamp = (timestamp: string): { start: number; end: number } => {
@@ -107,9 +122,24 @@ export default function ThemeList({ currentTime, videoDuration, onSeekTime }: Th
     return colors[index % colors.length];
   };
 
-  const generateTimeMarkers = (duration: number) => {
+  const generateTimeMarkers = (duration: number, width: number) => {
     const markers: { time: number; label: string }[] = [];
-    const interval = 60; // 1 minute interval
+
+    const minSpacing = 50;
+    const maxMarkers = Math.floor(width / minSpacing);
+
+    let interval: number;
+    if (maxMarkers <= 5) {
+      interval = Math.ceil(duration / 5);
+    } else if (maxMarkers <= 10) {
+      interval = Math.ceil(duration / 10);
+    } else if (maxMarkers <= 20) {
+      interval = Math.ceil(duration / 20);
+    } else {
+      interval = Math.ceil(duration / 30);
+    }
+
+    interval = Math.max(interval, 10);
 
     for (let time = 0; time <= duration; time += interval) {
       markers.push({
@@ -131,10 +161,10 @@ export default function ThemeList({ currentTime, videoDuration, onSeekTime }: Th
 
   // Use video duration if available, otherwise fall back to calculated total time
   const effectiveTotalTime = videoDuration > 0 ? videoDuration : totalVideoTime;
-  const timeMarkers = generateTimeMarkers(effectiveTotalTime);
+  const timeMarkers = generateTimeMarkers(effectiveTotalTime, containerWidth);
 
   return (
-    <div className="h-full flex flex-col">
+    <div ref={containerRef} className="h-full flex flex-col">
       {/* Time markers */}
       <div className="relative h-6 mb-1">
         {timeMarkers.map((marker, index) => (
@@ -191,7 +221,7 @@ export default function ThemeList({ currentTime, videoDuration, onSeekTime }: Th
             return (
               <div
                 key={theme.id}
-                className="p-3 rounded-lg cursor-pointer hover:shadow-sm transition-shadow"
+                className="p-3 rounded-lg cursor-pointer hover:shadow-sm transition-shadow hover:cursor-pointer"
                 style={{ backgroundColor: getBackgroundColor(index) }}
                 onClick={() => handleThemeClick(start, theme.quote.timestamp)}
               >

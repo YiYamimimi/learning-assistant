@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import MarkdownWithTimestamps from './MarkdownWithTimestamps';
+
+/* global TextDecoder */
 
 interface Message {
   role: 'user' | 'assistant';
@@ -18,30 +20,25 @@ interface RelevantChunk {
 
 interface AIChatProps {
   subtitleData: any;
+  messages: Message[];
+  setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
 }
 
-export default function AIChat({ subtitleData }: AIChatProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export default function AIChat({ subtitleData, messages, setMessages }: AIChatProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [relevantChunks, setRelevantChunks] = useState<RelevantChunk[]>([]);
   const messagesEndRef = useRef<globalThis.HTMLDivElement>(null);
 
   const PRESET_QUESTIONS = [
-    '这个视频的主要收获是什么?',
-    '这个视频中最精彩的语录是什么?',
     '这个视频的主要观点是什么?',
+    '这个视频有哪些经常片段?',
+    '这个视频中最精彩的语录是什么?',
   ];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, relevantChunks]);
-
-  const formatTime = (ms: number): string => {
-    const minutes = Math.floor(ms / 60);
-    const seconds = Math.floor(ms % 60);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
 
   const handleTimestampClick = (timestamp: string) => {
     const [minutesStr, secondsStr] = timestamp.split(':');
@@ -50,33 +47,101 @@ export default function AIChat({ subtitleData }: AIChatProps) {
     if (isNaN(minutes) || isNaN(seconds)) return;
     const totalSeconds = minutes * 60 + Math.min(seconds, 59);
     console.log(`跳转到时间点: ${timestamp} (${totalSeconds}秒)`);
-    // 这里可以添加跳转到视频时间的逻辑
+
+    const videoElement = document.querySelector('video') as globalThis.HTMLVideoElement;
+    if (videoElement) {
+      videoElement.currentTime = totalSeconds;
+      videoElement.play();
+    }
   };
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (presetQuestion?: string) => {
+    const messageToSend = presetQuestion || input.trim();
+    if (!messageToSend || isLoading) return;
 
-    const userMessage = input.trim();
-    setInput('');
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+    if (!presetQuestion) {
+      setInput('');
+    }
+    setMessages((prev) => [...prev, { role: 'user', content: messageToSend }]);
     setIsLoading(true);
     setRelevantChunks([]);
 
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: '',
+      },
+    ]);
+
     try {
-      // Simulate AI response (will connect to OpenAI API later)
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const cleanSubtitleData =
+        subtitleData && Array.isArray(subtitleData)
+          ? subtitleData.map((item: any) => ({
+              from: item.from,
+              to: item.to,
+              content: item.content,
+            }))
+          : null;
 
-      // Mock response
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content:
-            'This is a mock AI response. In production, this would connect to the OpenAI API.',
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      ]);
+        body: JSON.stringify({
+          messages: messages.map((msg) => ({ role: msg.role, content: msg.content })),
+          currentQuestion: messageToSend,
+          subtitleData: cleanSubtitleData,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      // Mock relevant chunks
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                break;
+              }
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.content) {
+                  fullContent += parsed.content;
+                  setIsLoading(false);
+                  setMessages((prev) => {
+                    const newMessages = [...prev];
+                    if (newMessages.length > 0) {
+                      newMessages[newMessages.length - 1] = {
+                        role: 'assistant',
+                        content: fullContent,
+                      };
+                    }
+                    return newMessages;
+                  });
+                }
+              } catch (error) {
+                console.error('Error parsing JSON:', error);
+              }
+            }
+          }
+        }
+      }
+
       if (subtitleData && Array.isArray(subtitleData)) {
         const mockChunks: RelevantChunk[] = subtitleData
           .slice(0, 3)
@@ -90,7 +155,16 @@ export default function AIChat({ subtitleData }: AIChatProps) {
       }
     } catch (error) {
       console.error('发送消息失败:', error);
-      setMessages((prev) => [...prev, { role: 'assistant', content: '抱歉，发生了错误。' }]);
+      setMessages((prev) => {
+        const newMessages = [...prev];
+        if (newMessages.length > 0) {
+          newMessages[newMessages.length - 1] = {
+            role: 'assistant',
+            content: '抱歉，发生了错误。',
+          };
+        }
+        return newMessages;
+      });
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +173,7 @@ export default function AIChat({ subtitleData }: AIChatProps) {
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-        {messages.length === 0 && (
+        {
           <div className="flex flex-col items-end justify-end gap-3 pt-1">
             {PRESET_QUESTIONS.map((question, index) => (
               <button
@@ -111,62 +185,47 @@ export default function AIChat({ subtitleData }: AIChatProps) {
               </button>
             ))}
           </div>
-        )}
+        }
 
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
+        {!isLoading &&
+          messages.map((msg, index) => (
             <div
-              className={`max-w-[80%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}
+              key={index}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              {msg.role === 'assistant' ? (
-                <MarkdownWithTimestamps
-                  content={msg.content}
-                  onTimestampClick={handleTimestampClick}
-                />
-              ) : (
-                msg.content
-              )}
+              <div
+                className={`max-w-[80%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}
+              >
+                {msg.role === 'assistant' ? (
+                  <MarkdownWithTimestamps
+                    content={msg.content}
+                    onTimestampClick={handleTimestampClick}
+                  />
+                ) : (
+                  msg.content
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-
-        {relevantChunks.length > 0 && (
-          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-            <h3 className="font-medium text-gray-700 mb-2">📺 相关字幕</h3>
-            <div className="space-y-2">
-              {relevantChunks.map((chunk, index) => (
-                <div key={index} className="p-2 bg-white rounded border border-gray-100">
-                  <div className="text-sm text-gray-500 mb-1">
-                    {formatTime(chunk.startTime)} - {formatTime(chunk.endTime)}
-                    <span className="ml-2 text-xs">
-                      (相似度: {(chunk.similarity * 100).toFixed(1)}%)
-                    </span>
-                  </div>
-                  <div className="text-sm">{chunk.content}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          ))}
 
         {isLoading && (
-          <div className="flex justify-center">
-            <div className="typing-indicator">
-              <span
-                className="h-2 w-2 bg-gray-400 rounded-full mx-0.5 animate-bounce"
-                style={{ animationDelay: '0ms' }}
-              ></span>
-              <span
-                className="h-2 w-2 bg-gray-400 rounded-full mx-0.5 animate-bounce"
-                style={{ animationDelay: '150ms' }}
-              ></span>
-              <span
-                className="h-2 w-2 bg-gray-400 rounded-full mx-0.5 animate-bounce"
-                style={{ animationDelay: '300ms' }}
-              ></span>
+          <div className="flex justify-start">
+            <div className="bg-gray-100 p-4 rounded-lg flex items-center gap-3">
+              <div className="flex gap-1">
+                <span
+                  className="h-2 w-2 bg-blue-500 rounded-full animate-bounce"
+                  style={{ animationDelay: '0ms' }}
+                ></span>
+                <span
+                  className="h-2 w-2 bg-blue-500 rounded-full animate-bounce"
+                  style={{ animationDelay: '150ms' }}
+                ></span>
+                <span
+                  className="h-2 w-2 bg-blue-500 rounded-full animate-bounce"
+                  style={{ animationDelay: '300ms' }}
+                ></span>
+              </div>
+              <span className="text-gray-600 text-sm">正在思考……</span>
             </div>
           </div>
         )}
@@ -174,7 +233,7 @@ export default function AIChat({ subtitleData }: AIChatProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="flex border-t border-gray-200 pt-2">
+      <div className="flex border-t border-gray-200 pt-2 ">
         <input
           type="text"
           value={input}
@@ -182,7 +241,7 @@ export default function AIChat({ subtitleData }: AIChatProps) {
           onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
           placeholder="输入问题..."
           disabled={isLoading}
-          className="flex-1 p-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 p-2 border border-gray-300 rounded-l-lg focus:outline-none text-gray-500 focus:border-gray-400"
         />
         <button
           onClick={sendMessage}

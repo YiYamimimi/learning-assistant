@@ -10,8 +10,13 @@ export default function SubtitleList({ subtitleData }: SubtitleListProps) {
   };
 
   const handleTimeClick = (startTime: number) => {
-    // In a real implementation, this would communicate with the video player
     console.log('Seek to time:', startTime);
+
+    const videoElement = document.querySelector('video') as globalThis.HTMLVideoElement;
+    if (videoElement) {
+      videoElement.currentTime = startTime;
+      videoElement.play();
+    }
   };
 
   return (
@@ -19,11 +24,12 @@ export default function SubtitleList({ subtitleData }: SubtitleListProps) {
       {subtitleData && Array.isArray(subtitleData) ? (
         <div className="space-y-2">
           {subtitleData.map((subtitle: any, index: number) => (
-            <div key={index} className="flex items-start p-2 hover:bg-gray-50 rounded">
-              <span
-                className="text-purple-600 font-medium mr-3 whitespace-nowrap cursor-pointer hover:text-purple-800"
-                onClick={() => handleTimeClick(subtitle.from || 0)}
-              >
+            <div
+              key={index}
+              className="flex items-start p-2 hover:bg-gray-50 rounded cursor-pointer"
+              onClick={() => handleTimeClick(subtitle.from || 0)}
+            >
+              <span className="text-purple-600 font-medium mr-3 whitespace-nowrap cursor-pointer hover:text-purple-800">
                 {formatTime(subtitle.from || 0)}
               </span>
               <span className="flex-1 text-gray-700 text-sm">{subtitle.content || ''}</span>
