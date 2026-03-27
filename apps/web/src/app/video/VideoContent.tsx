@@ -24,18 +24,15 @@ interface ChatMessage {
 interface VideoHistory {
   videoId: string;
   videoUrl: string;
-  bvid?: string;
   messages: ChatMessage[];
   timestamp: number;
 }
 
 export default function VideoContent() {
   const searchParams = useSearchParams();
-  const url = searchParams.get('url');
   const localVideo = searchParams.get('localVideo');
   const localSubtitle = searchParams.get('localSubtitle');
   const example = searchParams.get('example');
-  const [bvid, setBvid] = useState('');
   const [subtitleData, setSubtitleData] = useState<SubtitleItem[] | null>(null);
   const [activeTab, setActiveTab] = useState('chat');
   const [subtitleStatus, setSubtitleStatus] = useState<string>('');
@@ -65,85 +62,8 @@ export default function VideoContent() {
     const history = existingHistory.find((h: VideoHistory) => h.videoId === videoId);
     if (history && history.messages.length > 0) {
       setChatMessages(history.messages);
-      console.log('已加载历史对话记录');
     }
   };
-
-  const fetchSubtitleData = useCallback(async (bvid: string) => {
-    setSubtitleStatus('正在获取字幕数据...');
-    setErrorMessage('');
-
-    try {
-      const wbiUrl = `https://api.bilibili.com/x/player/wbi/v2?bvid=${bvid}`;
-      setSubtitleStatus('正在获取视频信息...');
-
-      const response = await fetch(wbiUrl, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          Referer: `https://www.bilibili.com/video/${bvid}/`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const text = await response.text();
-      const data = JSON.parse(text);
-
-      if (data.data && data.data.subtitle && data.data.subtitle.subtitles) {
-        setSubtitleStatus('正在解析字幕信息...');
-
-        let targetSubtitle = data.data.subtitle.subtitles.find(
-          (i: { lan: string }) => i.lan === 'ai-zh'
-        );
-        if (!targetSubtitle) {
-          targetSubtitle = data.data.subtitle.subtitles[0];
-        }
-
-        if (targetSubtitle && targetSubtitle.subtitle_url) {
-          let subtitleUrl = targetSubtitle.subtitle_url;
-          if (!subtitleUrl.startsWith('http')) {
-            subtitleUrl = `https:${subtitleUrl}`;
-          }
-          setSubtitleStatus('正在下载字幕...');
-
-          const subtitleResponse = await fetch(subtitleUrl, {
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-              Referer: `https://www.bilibili.com/video/${bvid}/`,
-            },
-          });
-
-          if (!subtitleResponse.ok) {
-            throw new Error(`HTTP error! status: ${subtitleResponse.status}`);
-          }
-
-          const subtitleText = await subtitleResponse.text();
-          const subtitleData = JSON.parse(subtitleText);
-
-          const finalData = subtitleData.body || subtitleData;
-
-          setSubtitleData(finalData);
-          setSubtitleStatus('字幕获取成功！');
-        } else {
-          setErrorMessage('未找到字幕 URL');
-          setSubtitleStatus('');
-          getMockData();
-        }
-      } else {
-        setErrorMessage('未找到字幕信息');
-        setSubtitleStatus('');
-        getMockData();
-      }
-    } catch (error) {
-      setErrorMessage(`获取字幕失败: ${error instanceof Error ? error.message : '未知错误'}`);
-      setSubtitleStatus('');
-      getMockData();
-    }
-  }, []);
 
   const loadLocalSubtitle = useCallback(async (subtitleName: string) => {
     try {
@@ -215,7 +135,7 @@ export default function VideoContent() {
   useEffect(() => {
     setIsClient(true);
 
-    const newVideoId = url || localVideo || example || '';
+    const newVideoId = localVideo || example || '';
     if (newVideoId !== currentVideoId) {
       setCurrentVideoId(newVideoId);
       setChatMessages([]);
@@ -225,7 +145,6 @@ export default function VideoContent() {
     if (example) {
       setIsLocalVideo(true);
       setVideoUrl('/example/videoplayback.mp4');
-
       loadExampleSubtitle();
     } else if (localVideo) {
       setIsLocalVideo(true);
@@ -234,39 +153,8 @@ export default function VideoContent() {
       if (localSubtitle) {
         loadLocalSubtitle(localSubtitle);
       }
-    } else if (url) {
-      setIsLocalVideo(false);
-      let extractedBvid = '';
-
-      const patterns = [/bvid=([a-zA-Z0-9]+)/, /\/video\/([a-zA-Z0-9]+)\/?/, /BV[a-zA-Z0-9]+/];
-
-      for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match) {
-          extractedBvid = match[1] || match[0];
-          break;
-        }
-      }
-
-      if (extractedBvid) {
-        if (!extractedBvid.startsWith('BV')) {
-          extractedBvid = 'BV' + extractedBvid;
-        }
-        setBvid(extractedBvid);
-      } else {
-        const testBvid = 'BV1ojfDBSEPv';
-        setBvid(testBvid);
-      }
     }
-  }, [
-    url,
-    localVideo,
-    localSubtitle,
-    example,
-    loadLocalSubtitle,
-    loadExampleSubtitle,
-    currentVideoId,
-  ]);
+  }, [localVideo, localSubtitle, example, loadLocalSubtitle, loadExampleSubtitle, currentVideoId]);
 
   const parseSRT = (srtContent: string): SubtitleItem[] => {
     const subtitles: SubtitleItem[] = [];
@@ -354,17 +242,10 @@ export default function VideoContent() {
   };
 
   useEffect(() => {
-    if (bvid) {
-      fetchSubtitleData(bvid);
-    }
-  }, [bvid, fetchSubtitleData]);
-
-  useEffect(() => {
     if (currentVideoId && chatMessages.length > 0) {
       const history: VideoHistory = {
         videoId: currentVideoId,
         videoUrl,
-        bvid,
         messages: chatMessages,
         timestamp: Date.now(),
       };
@@ -376,7 +257,7 @@ export default function VideoContent() {
       const newHistory = [history, ...filteredHistory].slice(0, 10);
       localStorage.setItem('videoHistory', JSON.stringify(newHistory));
     }
-  }, [chatMessages, currentVideoId, videoUrl, bvid]);
+  }, [chatMessages, currentVideoId, videoUrl]);
 
   return (
     <div className="flex flex-col lg:flex-row p-5 h-screen bg-gray-50 gap-6">
@@ -455,15 +336,6 @@ export default function VideoContent() {
                 }}
               />
             </>
-          ) : isClient && bvid ? (
-            <iframe
-              src={`https://player.bilibili.com/player.html?bvid=${bvid}&page=1`}
-              width="100%"
-              height="100%"
-              frameBorder="0"
-              allowFullScreen={true}
-              title="Bilibili Video"
-            />
           ) : (
             <div className="flex h-full items-center justify-center text-white">
               No video URL provided
