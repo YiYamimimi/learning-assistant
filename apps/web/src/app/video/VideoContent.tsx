@@ -47,6 +47,8 @@ export default function VideoContent() {
   const [videoDuration, setVideoDuration] = useState(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [currentVideoId, setCurrentVideoId] = useState<string>('');
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoError, setVideoError] = useState<string>('');
 
   const getMockData = () => {
     setSubtitleData([
@@ -93,7 +95,9 @@ export default function VideoContent() {
       if (data.data && data.data.subtitle && data.data.subtitle.subtitles) {
         setSubtitleStatus('正在解析字幕信息...');
 
-        let targetSubtitle = data.data.subtitle.subtitles.find((i: any) => i.lan === 'ai-zh');
+        let targetSubtitle = data.data.subtitle.subtitles.find(
+          (i: { lan: string }) => i.lan === 'ai-zh'
+        );
         if (!targetSubtitle) {
           targetSubtitle = data.data.subtitle.subtitles[0];
         }
@@ -189,11 +193,13 @@ export default function VideoContent() {
 
       const data = await response.json();
 
-      const subtitles = data.resp.utterances.map((item: any) => ({
-        from: item.start_time / 1000,
-        to: item.end_time / 1000,
-        content: item.text,
-      }));
+      const subtitles = data.resp.utterances.map(
+        (item: { start_time: number; end_time: number; text: string }) => ({
+          from: item.start_time / 1000,
+          to: item.end_time / 1000,
+          content: item.text,
+        })
+      );
 
       setSubtitleData(subtitles);
       setSubtitleStatus('示例字幕加载成功！');
@@ -252,7 +258,15 @@ export default function VideoContent() {
         setBvid(testBvid);
       }
     }
-  }, [url, localVideo, localSubtitle, example, loadLocalSubtitle, loadExampleSubtitle]);
+  }, [
+    url,
+    localVideo,
+    localSubtitle,
+    example,
+    loadLocalSubtitle,
+    loadExampleSubtitle,
+    currentVideoId,
+  ]);
 
   const parseSRT = (srtContent: string): SubtitleItem[] => {
     const subtitles: SubtitleItem[] = [];
@@ -368,16 +382,79 @@ export default function VideoContent() {
     <div className="flex flex-col lg:flex-row p-5 h-screen bg-gray-50 gap-6">
       {/* Left side - 65% */}
       <div className="flex-[0.65] flex flex-col min-w-0">
+        {/* Video info */}
+        {isClient && isLocalVideo && (
+          <div className="mb-4 bg-white rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <svg
+                    className="w-6 h-6 text-blue-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">本地视频</h3>
+                  <p className="text-sm text-gray-500">直接使用上传的视频文件</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-500">
+                  {videoDuration > 0
+                    ? `${Math.floor(videoDuration / 60)}:${(videoDuration % 60).toFixed(0).padStart(2, '0')}`
+                    : '--:--'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Video player */}
-        <div className="flex-1 bg-black rounded-2xl overflow-hidden min-h-0">
+        <div className="flex-1 bg-black rounded-2xl overflow-hidden min-h-0 relative">
           {isClient && isLocalVideo ? (
-            <video
-              src={videoUrl}
-              controls={true}
-              className="w-full h-full object-contain"
-              onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-              onLoadedMetadata={(e) => setVideoDuration(e.currentTarget.duration)}
-            />
+            <>
+              {videoLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                  <div className="text-white text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                    <p>视频加载中...</p>
+                  </div>
+                </div>
+              )}
+              {videoError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                  <div className="text-white text-center p-6">
+                    <p className="text-red-400 mb-2">视频加载失败</p>
+                    <p className="text-sm">{videoError}</p>
+                  </div>
+                </div>
+              )}
+              <video
+                src={videoUrl}
+                controls={true}
+                className="w-full h-full object-contain"
+                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                onLoadedMetadata={(e) => {
+                  setVideoDuration(e.currentTarget.duration);
+                  setVideoLoading(false);
+                  setVideoError('');
+                }}
+                onLoadStart={() => setVideoLoading(true)}
+                onError={() => {
+                  setVideoLoading(false);
+                  setVideoError('无法加载视频文件，请检查文件格式是否正确');
+                }}
+              />
+            </>
           ) : isClient && bvid ? (
             <iframe
               src={`https://player.bilibili.com/player.html?bvid=${bvid}&page=1`}

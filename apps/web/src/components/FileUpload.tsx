@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import React from 'react';
-import { Upload, FileVideo, Play } from 'lucide-react';
+import { Upload, FileVideo, Play, CheckCircle } from 'lucide-react';
 
 interface FileUploadProps {
   onVideoUpload: (file: globalThis.File) => void;
@@ -11,11 +11,18 @@ interface FileUploadProps {
 
 export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps) {
   const videoInputRef = useRef<globalThis.HTMLInputElement>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
 
   const handleVideoUpload = (e: React.ChangeEvent<globalThis.HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       onVideoUpload(file);
+      setUploadSuccess(true);
+
+      setTimeout(() => {
+        const videoUrl = URL.createObjectURL(file);
+        window.location.href = `/video?localVideo=${encodeURIComponent(videoUrl)}`;
+      }, 1500);
     }
   };
 
@@ -38,26 +45,34 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
             <FileVideo className="h-5 w-5 text-gray-500" />
           </div>
 
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
-            <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-sm text-gray-600 mb-2">点击或拖拽上传视频文件</p>
-            <p className="text-xs text-gray-400">支持 MP4, WebM, AVI 等格式</p>
-            <input
-              ref={videoInputRef}
-              type="file"
-              accept="video/*"
-              onChange={handleVideoUpload}
-              className="hidden"
-            />
-            <button
-              onClick={() => videoInputRef.current?.click()}
-              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              选择视频文件
-            </button>
-          </div>
+          {uploadSuccess ? (
+            <div className="border-2 border-green-200 rounded-lg p-8 text-center bg-green-50">
+              <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-500" />
+              <p className="text-lg font-medium text-green-700 mb-2">上传成功！</p>
+              <p className="text-sm text-green-600">正在跳转到视频页面...</p>
+            </div>
+          ) : (
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
+              <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-sm text-gray-600 mb-2">点击或拖拽上传视频文件</p>
+              <p className="text-xs text-gray-400">支持 MP4, WebM, AVI 等格式</p>
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                onChange={handleVideoUpload}
+                className="hidden"
+              />
+              <button
+                onClick={() => videoInputRef.current?.click()}
+                className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                选择视频文件
+              </button>
+            </div>
+          )}
 
-          {videoFile && (
+          {videoFile && !uploadSuccess && (
             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
               <div className="flex items-center">
                 <FileVideo className="h-5 w-5 text-blue-600 mr-2" />
@@ -86,21 +101,6 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
             </button>
           </div>
         </div>
-
-        {/* Start Button */}
-        {videoFile && (
-          <button
-            onClick={() => {
-              if (videoFile) {
-                const videoUrl = URL.createObjectURL(videoFile);
-                window.location.href = `/video?localVideo=${encodeURIComponent(videoUrl)}`;
-              }
-            }}
-            className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg"
-          >
-            开始学习
-          </button>
-        )}
       </div>
     </div>
   );
