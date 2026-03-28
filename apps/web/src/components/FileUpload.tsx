@@ -6,6 +6,13 @@ import { useRef, useState } from 'react';
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Upload, FileVideo, Play, CheckCircle } from 'lucide-react';
+import {
+  calculateFileHash,
+  isVideoUploaded,
+  saveVideoMetadata,
+  generateSubtitleData,
+  generateThemeData,
+} from '@/utils/fileHash';
 
 interface FileUploadProps {
   onVideoUpload: (file: globalThis.File) => void;
@@ -17,7 +24,7 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const router = useRouter();
 
-  const handleVideoUpload = (e: React.ChangeEvent<globalThis.HTMLInputElement>) => {
+  const handleVideoUpload = async (e: React.ChangeEvent<globalThis.HTMLInputElement>) => {
     const file = e.target.files?.[0];
     console.log(file, 'file', e.target.files);
 
@@ -25,15 +32,53 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
       onVideoUpload(file);
       setUploadSuccess(true);
 
-      const localVideoUrl = URL.createObjectURL(file);
-      console.log('本地视频 URL:', localVideoUrl);
-      console.log('文件信息:', file);
+      try {
+        const fileHash = await calculateFileHash(file);
+        console.log('文件哈希值:', fileHash);
 
-      sessionStorage.setItem('localVideoUrl', localVideoUrl);
+        const videoUrl = URL.createObjectURL(file);
+        sessionStorage.setItem('localVideoUrl', videoUrl);
 
-      setTimeout(() => {
-        router.push('/video?localVideo=true');
-      }, 1500);
+        const existingMetadata = isVideoUploaded(fileHash);
+
+        if (existingMetadata) {
+          console.log('文件已上传过，使用历史记录');
+
+          sessionStorage.setItem('videoHash', fileHash);
+
+          setTimeout(() => {
+            router.push(`/video?localVideo=true`);
+          }, 1500);
+          return;
+        }
+
+        console.log('新文件，生成字幕和主题');
+        const filenameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+
+        const subtitleData = generateSubtitleData(filenameWithoutExt);
+        const themeData = generateThemeData();
+
+        const metadata = {
+          filename: file.name,
+          size: file.size,
+          uploadedAt: Date.now(),
+          subtitleData,
+          themeData,
+        };
+
+        saveVideoMetadata(fileHash, metadata);
+        sessionStorage.setItem('videoHash', fileHash);
+
+        console.log('字幕数据:', subtitleData);
+        console.log('主题数据:', themeData);
+
+        setTimeout(() => {
+          router.push(`/video?localVideo=true`);
+        }, 1500);
+      } catch (error) {
+        console.error('上传失败:', error);
+        setUploadSuccess(false);
+      }
     }
   };
 

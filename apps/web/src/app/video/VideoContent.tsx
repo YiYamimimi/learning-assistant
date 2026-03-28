@@ -6,6 +6,7 @@ import { Tabs, Tab } from '@/components/Tabs';
 import AIChat from '@/components/AIChat';
 import SubtitleList from '@/components/SubtitleList';
 import ThemeList from '@/components/ThemeList';
+import { getVideoMetadata } from '@/utils/fileHash';
 
 /* global localStorage, sessionStorage */
 
@@ -28,6 +29,22 @@ interface VideoHistory {
   timestamp: number;
 }
 
+interface VideoTheme {
+  id: string;
+  title: string;
+  duration: number;
+  quote: {
+    text: string;
+    timestamp: string;
+  };
+  segments: Array<{
+    start: number;
+    end: number;
+    text: string;
+    confidence: number;
+  }>;
+}
+
 export default function VideoContent() {
   const searchParams = useSearchParams();
   const localVideo = searchParams.get('localVideo');
@@ -48,6 +65,7 @@ export default function VideoContent() {
   const [currentVideoId, setCurrentVideoId] = useState<string>('');
   const [videoLoading, setVideoLoading] = useState(false);
   const [videoError, setVideoError] = useState<string>('');
+  const [themeData, setThemeData] = useState<VideoTheme[]>([]);
 
   const getMockData = () => {
     setSubtitleData([
@@ -156,6 +174,38 @@ export default function VideoContent() {
         console.log('从 sessionStorage 获取视频 URL:', storedVideoUrl);
       } else {
         setVideoError('无法获取视频 URL，请重新上传视频');
+      }
+
+      const videoHash = sessionStorage.getItem('videoHash');
+      if (videoHash) {
+        console.log('从 localStorage 获取视频哈希:', videoHash);
+        const metadata = getVideoMetadata(videoHash);
+
+        if (metadata) {
+          console.log('找到视频元数据:', metadata);
+
+          const subtitleItems = metadata.subtitleData.resp.utterances.map((ut) => ({
+            from: ut.start_time / 1000,
+            to: ut.end_time / 1000,
+            content: ut.text,
+          }));
+
+          console.log('转换后的字幕数据:', subtitleItems);
+          setSubtitleData(subtitleItems);
+
+          const themes = metadata.themeData.themes.map((theme) => ({
+            id: theme.id,
+            title: theme.title,
+            duration: theme.duration,
+            quote: theme.quote,
+            segments: theme.segments,
+          }));
+
+          console.log('转换后的主题数据:', themes);
+          setThemeData(themes);
+        } else {
+          console.log('未找到视频元数据');
+        }
       }
 
       if (localSubtitle) {
@@ -356,6 +406,7 @@ export default function VideoContent() {
           <ThemeList
             currentTime={currentTime}
             videoDuration={videoDuration}
+            themes={themeData}
             onSeekTime={(time) => {
               const videoElement = document.querySelector('video') as globalThis.HTMLVideoElement;
               if (videoElement) {

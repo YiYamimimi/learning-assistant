@@ -1,0 +1,21 @@
+{
+  "themes": [
+    {
+      "id": "1",
+      "title": "高光",
+      "duration": 10000,
+      "quote": {
+        "text": "精彩瞬间",
+        "timestamp": "00:10"
+      },
+      "segments": [
+        {
+          "start": 10000,
+          "end": 20000,
+          "text": "高光时刻",
+          "confidence": 1
+        }
+      ]
+    }
+  ]
+}

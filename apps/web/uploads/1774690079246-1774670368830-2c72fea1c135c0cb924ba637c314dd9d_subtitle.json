@@ -1,0 +1,16 @@
+{
+  "resp": {
+    "utterances": [
+      {
+        "start_time": 0,
+        "end_time": 10000,
+        "text": "00:00 视频开始"
+      },
+      {
+        "start_time": 10000,
+        "end_time": 20000,
+        "text": "高光时刻"
+      }
+    ]
+  }
+}

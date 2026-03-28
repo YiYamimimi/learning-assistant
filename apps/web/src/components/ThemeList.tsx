@@ -22,16 +22,28 @@ interface ThemeListProps {
   currentTime: number;
   videoDuration: number;
   onSeekTime: (time: number) => void;
+  themes?: VideoTheme[];
 }
 
-export default function ThemeList({ currentTime, videoDuration, onSeekTime }: ThemeListProps) {
-  const [themes, setThemes] = useState<VideoTheme[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export default function ThemeList({
+  currentTime,
+  videoDuration,
+  onSeekTime,
+  themes: externalThemes,
+}: ThemeListProps) {
+  const [themes, setThemes] = useState<VideoTheme[]>(externalThemes || []);
+  const [isLoading, setIsLoading] = useState(!externalThemes);
   const [totalVideoTime, setTotalVideoTime] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (externalThemes) {
+      setThemes(externalThemes);
+      setIsLoading(false);
+      return;
+    }
+
     fetch('/example/topic.json')
       .then((response) => response.json())
       .then((data) => {
@@ -47,7 +59,7 @@ export default function ThemeList({ currentTime, videoDuration, onSeekTime }: Th
         console.error('Failed to fetch theme data:', error);
         setIsLoading(false);
       });
-  }, []);
+  }, [externalThemes]);
 
   useEffect(() => {
     const updateWidth = () => {
