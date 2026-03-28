@@ -7,7 +7,7 @@ import AIChat from '@/components/AIChat';
 import SubtitleList from '@/components/SubtitleList';
 import ThemeList from '@/components/ThemeList';
 
-/* global localStorage */
+/* global localStorage, sessionStorage */
 
 interface SubtitleItem {
   from: number;
@@ -31,6 +31,8 @@ interface VideoHistory {
 export default function VideoContent() {
   const searchParams = useSearchParams();
   const localVideo = searchParams.get('localVideo');
+  console.log(localVideo, 'localVideo');
+
   const localSubtitle = searchParams.get('localSubtitle');
   const example = searchParams.get('example');
   const [subtitleData, setSubtitleData] = useState<SubtitleItem[] | null>(null);
@@ -148,7 +150,13 @@ export default function VideoContent() {
       loadExampleSubtitle();
     } else if (localVideo) {
       setIsLocalVideo(true);
-      setVideoUrl(localVideo);
+      const storedVideoUrl = sessionStorage.getItem('localVideoUrl');
+      if (storedVideoUrl) {
+        setVideoUrl(storedVideoUrl);
+        console.log('从 sessionStorage 获取视频 URL:', storedVideoUrl);
+      } else {
+        setVideoError('无法获取视频 URL，请重新上传视频');
+      }
 
       if (localSubtitle) {
         loadLocalSubtitle(localSubtitle);

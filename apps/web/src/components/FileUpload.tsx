@@ -1,7 +1,10 @@
 'use client';
 
+/* global sessionStorage */
+
 import { useRef, useState } from 'react';
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Upload, FileVideo, Play, CheckCircle } from 'lucide-react';
 
 interface FileUploadProps {
@@ -12,16 +15,24 @@ interface FileUploadProps {
 export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps) {
   const videoInputRef = useRef<globalThis.HTMLInputElement>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const router = useRouter();
 
   const handleVideoUpload = (e: React.ChangeEvent<globalThis.HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    console.log(file, 'file', e.target.files);
+
     if (file) {
       onVideoUpload(file);
       setUploadSuccess(true);
 
+      const localVideoUrl = URL.createObjectURL(file);
+      console.log('本地视频 URL:', localVideoUrl);
+      console.log('文件信息:', file);
+
+      sessionStorage.setItem('localVideoUrl', localVideoUrl);
+
       setTimeout(() => {
-        const videoUrl = URL.createObjectURL(file);
-        window.location.href = `/video?localVideo=${encodeURIComponent(videoUrl)}`;
+        router.push('/video?localVideo=true');
       }, 1500);
     }
   };
