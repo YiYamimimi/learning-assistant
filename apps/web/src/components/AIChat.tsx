@@ -244,7 +244,7 @@ export default function AIChat({ subtitleData, messages, setMessages }: AIChatPr
           className="flex-1 p-2 border border-gray-300 rounded-l-lg focus:outline-none text-gray-500 focus:border-gray-400"
         />
         <button
-          onClick={sendMessage}
+          onClick={() => sendMessage()}
           disabled={isLoading || !input.trim()}
           className="px-4 py-2 bg-blue-500 text-white rounded-r-lg hover:bg-blue-600 disabled:bg-gray-300"
         >

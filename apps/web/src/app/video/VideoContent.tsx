@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Tabs, Tab } from '@/components/Tabs';
 import AIChat from '@/components/AIChat';
 import SubtitleList from '@/components/SubtitleList';
 import ThemeList from '@/components/ThemeList';
-import { getVideoMetadata } from '@/utils/fileHash';
+import HistoryPanel from '@/components/HistoryPanel';
+import Navbar from '@/components/Navbar';
+import { getVideoMetadata, updateChatMessages } from '@/utils/fileHash';
 
-/* global localStorage, sessionStorage */
+/* global sessionStorage */
 
 interface SubtitleItem {
   from: number;
@@ -20,13 +22,6 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamps?: string[];
-}
-
-interface VideoHistory {
-  videoId: string;
-  videoUrl: string;
-  messages: ChatMessage[];
-  timestamp: number;
 }
 
 interface VideoTheme {
@@ -53,7 +48,7 @@ export default function VideoContent() {
   const localSubtitle = searchParams.get('localSubtitle');
   const example = searchParams.get('example');
   const [subtitleData, setSubtitleData] = useState<SubtitleItem[] | null>(null);
-  const [activeTab, setActiveTab] = useState('chat');
+  const [activeTab, setActiveTab] = useState('subtitles');
   const [subtitleStatus, setSubtitleStatus] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isLocalVideo, setIsLocalVideo] = useState(false);
@@ -66,6 +61,12 @@ export default function VideoContent() {
   const [videoLoading, setVideoLoading] = useState(false);
   const [videoError, setVideoError] = useState<string>('');
   const [themeData, setThemeData] = useState<VideoTheme[]>([]);
+  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
+  const [currentVideoHash, setCurrentVideoHash] = useState<string>('');
+  const [usageLimitReached, setUsageLimitReached] = useState(false);
+  const [usageCount, setUsageCount] = useState(0);
+  const hasRecordedUsageRef = useRef(false);
+  const isRecordingRef = useRef(false);
 
   const getMockData = () => {
     setSubtitleData([
@@ -77,13 +78,33 @@ export default function VideoContent() {
     ]);
   };
 
-  const loadVideoHistory = (videoId: string) => {
-    const existingHistory = JSON.parse(localStorage.getItem('videoHistory') || '[]');
-    const history = existingHistory.find((h: VideoHistory) => h.videoId === videoId);
-    if (history && history.messages.length > 0) {
-      setChatMessages(history.messages);
+  const recordUsage = useCallback(async () => {
+    if (hasRecordedUsageRef.current || usageLimitReached || isRecordingRef.current) {
+      return;
     }
-  };
+
+    isRecordingRef.current = true;
+    hasRecordedUsageRef.current = true;
+
+    try {
+      const response = await fetch('/api/record-usage', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUsageCount(data.usageCount);
+        setUsageLimitReached(data.used);
+        console.log('使用情况已记录:', data);
+      }
+    } catch (error) {
+      console.error('记录使用情况失败:', error);
+      hasRecordedUsageRef.current = false;
+    } finally {
+      isRecordingRef.current = false;
+    }
+  }, [usageLimitReached]);
 
   const loadLocalSubtitle = useCallback(async (subtitleName: string) => {
     try {
@@ -159,8 +180,22 @@ export default function VideoContent() {
     if (newVideoId !== currentVideoId) {
       setCurrentVideoId(newVideoId);
       setChatMessages([]);
-      loadVideoHistory(newVideoId);
+      hasRecordedUsageRef.current = false;
+      isRecordingRef.current = false;
     }
+
+    const checkUsageStatus = async () => {
+      try {
+        const response = await fetch('/api/record-usage');
+        const data = await response.json();
+        setUsageLimitReached(data.used);
+        setUsageCount(data.usageCount || 0);
+      } catch (error) {
+        console.error('检查使用状态失败:', error);
+      }
+    };
+
+    checkUsageStatus();
 
     if (example) {
       setIsLocalVideo(true);
@@ -178,31 +213,41 @@ export default function VideoContent() {
 
       const videoHash = sessionStorage.getItem('videoHash');
       if (videoHash) {
-        console.log('从 localStorage 获取视频哈希:', videoHash);
+        setCurrentVideoHash(videoHash);
+        console.log('从 sessionStorage 获取视频哈希:', videoHash);
         const metadata = getVideoMetadata(videoHash);
 
         if (metadata) {
           console.log('找到视频元数据:', metadata);
 
-          const subtitleItems = metadata.subtitleData.resp.utterances.map((ut) => ({
-            from: ut.start_time / 1000,
-            to: ut.end_time / 1000,
-            content: ut.text,
-          }));
+          if (!usageLimitReached && metadata.subtitleData && metadata.themeData) {
+            const subtitleItems = metadata.subtitleData.resp.utterances.map((ut) => ({
+              from: ut.start_time / 1000,
+              to: ut.end_time / 1000,
+              content: ut.text,
+            }));
 
-          console.log('转换后的字幕数据:', subtitleItems);
-          setSubtitleData(subtitleItems);
+            console.log('转换后的字幕数据:', subtitleItems);
+            setSubtitleData(subtitleItems);
 
-          const themes = metadata.themeData.themes.map((theme) => ({
-            id: theme.id,
-            title: theme.title,
-            duration: theme.duration,
-            quote: theme.quote,
-            segments: theme.segments,
-          }));
+            const themes = metadata.themeData.themes.map((theme) => ({
+              id: theme.id,
+              title: theme.title,
+              duration: theme.duration,
+              quote: theme.quote,
+              segments: theme.segments,
+            }));
 
-          console.log('转换后的主题数据:', themes);
-          setThemeData(themes);
+            console.log('转换后的主题数据:', themes);
+            setThemeData(themes);
+
+            recordUsage();
+          }
+
+          if (metadata.chatMessages && metadata.chatMessages.length > 0) {
+            console.log('加载历史聊天记录:', metadata.chatMessages);
+            setChatMessages(metadata.chatMessages);
+          }
         } else {
           console.log('未找到视频元数据');
         }
@@ -212,7 +257,16 @@ export default function VideoContent() {
         loadLocalSubtitle(localSubtitle);
       }
     }
-  }, [localVideo, localSubtitle, example, loadLocalSubtitle, loadExampleSubtitle, currentVideoId]);
+  }, [
+    localVideo,
+    localSubtitle,
+    example,
+    loadLocalSubtitle,
+    loadExampleSubtitle,
+    currentVideoId,
+    recordUsage,
+    usageLimitReached,
+  ]);
 
   const parseSRT = (srtContent: string): SubtitleItem[] => {
     const subtitles: SubtitleItem[] = [];
@@ -300,153 +354,168 @@ export default function VideoContent() {
   };
 
   useEffect(() => {
-    if (currentVideoId && chatMessages.length > 0) {
-      const history: VideoHistory = {
-        videoId: currentVideoId,
-        videoUrl,
-        messages: chatMessages,
-        timestamp: Date.now(),
-      };
-
-      const existingHistory = JSON.parse(localStorage.getItem('videoHistory') || '[]');
-      const filteredHistory = existingHistory.filter(
-        (h: VideoHistory) => h.videoId !== currentVideoId
-      );
-      const newHistory = [history, ...filteredHistory].slice(0, 10);
-      localStorage.setItem('videoHistory', JSON.stringify(newHistory));
+    if (currentVideoHash && chatMessages.length > 0 && !usageLimitReached) {
+      updateChatMessages(currentVideoHash, chatMessages);
     }
-  }, [chatMessages, currentVideoId, videoUrl]);
+  }, [chatMessages, currentVideoHash, usageLimitReached]);
 
   return (
-    <div className="flex flex-col lg:flex-row p-5 h-screen bg-gray-50 gap-6">
-      {/* Left side - 65% */}
-      <div className="flex-[0.65] flex flex-col min-w-0">
-        {/* Video info */}
-        {isClient && isLocalVideo && (
-          <div className="mb-4 bg-white rounded-lg p-4 border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <svg
-                    className="w-6 h-6 text-blue-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">本地视频</h3>
-                  <p className="text-sm text-gray-500">直接使用上传的视频文件</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500">
-                  {videoDuration > 0
-                    ? `${Math.floor(videoDuration / 60)}:${(videoDuration % 60).toFixed(0).padStart(2, '0')}`
-                    : '--:--'}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+    <div className="flex flex-col h-screen bg-gray-50">
+      <Navbar
+        onBack={() => (window.location.href = '/')}
+        onHistory={() => setIsHistoryPanelOpen(true)}
+        onLogin={() => console.log('登录功能待实现')}
+      />
 
-        {/* Video player */}
-        <div className="flex-1 bg-black rounded-2xl overflow-hidden min-h-0 relative">
-          {isClient && isLocalVideo ? (
-            <>
-              {videoLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-                  <div className="text-white text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-                    <p>视频加载中...</p>
+      <HistoryPanel
+        isOpen={isHistoryPanelOpen}
+        onClose={() => setIsHistoryPanelOpen(false)}
+        currentVideoHash={currentVideoHash}
+        onSelectHistory={(hash, filename, videoUrl) => {
+          setCurrentVideoHash(hash);
+          setVideoUrl(videoUrl);
+          setIsHistoryPanelOpen(false);
+          hasRecordedUsageRef.current = false;
+          isRecordingRef.current = false;
+
+          const metadata = getVideoMetadata(hash);
+          if (metadata) {
+            if (!usageLimitReached && metadata.subtitleData && metadata.themeData) {
+              const subtitleItems = metadata.subtitleData.resp.utterances.map((ut) => ({
+                from: ut.start_time / 1000,
+                to: ut.end_time / 1000,
+                content: ut.text,
+              }));
+              setSubtitleData(subtitleItems);
+
+              const themes = metadata.themeData.themes.map((theme) => ({
+                id: theme.id,
+                title: theme.title,
+                duration: theme.duration,
+                quote: theme.quote,
+                segments: theme.segments,
+              }));
+              setThemeData(themes);
+
+              recordUsage();
+            }
+
+            if (metadata.chatMessages && metadata.chatMessages.length > 0) {
+              setChatMessages(metadata.chatMessages);
+            } else {
+              setChatMessages([]);
+            }
+          }
+        }}
+      />
+
+      <div className="flex flex-col lg:flex-row p-5 flex-1 gap-6 mt-16 min-h-0">
+        {/* Left side - 65% */}
+        <div className="flex-[0.65] flex flex-col min-h-0">
+          {/* Video player */}
+          <div className="flex-1 bg-black rounded-2xl overflow-hidden relative flex items-center justify-center min-h-0">
+            {isClient && isLocalVideo ? (
+              <>
+                {videoLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                    <div className="text-white text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                      <p>视频加载中...</p>
+                    </div>
                   </div>
-                </div>
-              )}
-              {videoError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-                  <div className="text-white text-center p-6">
-                    <p className="text-red-400 mb-2">视频加载失败</p>
-                    <p className="text-sm">{videoError}</p>
+                )}
+                {videoError && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                    <div className="text-white text-center p-6">
+                      <p className="text-red-400 mb-2">视频加载失败</p>
+                      <p className="text-sm">{videoError}</p>
+                    </div>
                   </div>
-                </div>
-              )}
-              <video
-                src={videoUrl}
-                controls={true}
-                className="w-full h-full object-contain"
-                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                onLoadedMetadata={(e) => {
-                  setVideoDuration(e.currentTarget.duration);
-                  setVideoLoading(false);
-                  setVideoError('');
-                }}
-                onLoadStart={() => setVideoLoading(true)}
-                onError={() => {
-                  setVideoLoading(false);
-                  setVideoError('无法加载视频文件，请检查文件格式是否正确');
-                }}
-              />
-            </>
-          ) : (
-            <div className="flex h-full items-center justify-center text-white">
-              No video URL provided
-            </div>
-          )}
-        </div>
-
-        {/* Theme list */}
-        <div className="h-48 lg:h-60 bg-white border-t border-gray-200 p-4 overflow-hidden">
-          <ThemeList
-            currentTime={currentTime}
-            videoDuration={videoDuration}
-            themes={themeData}
-            onSeekTime={(time) => {
-              const videoElement = document.querySelector('video') as globalThis.HTMLVideoElement;
-              if (videoElement) {
-                videoElement.currentTime = time;
-                videoElement.play();
-              }
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Right side - 35% */}
-      <div className="flex-[0.35] bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col min-w-0">
-        <Tabs activeTab={activeTab} setActiveTab={setActiveTab}>
-          <Tab id="chat" label="AI Chat" />
-          <Tab id="subtitles" label="Subtitles" />
-        </Tabs>
-
-        <div className="flex-1 overflow-auto p-4 min-h-0 flex flex-col">
-          {/* Status and error messages */}
-          {subtitleStatus && (
-            <div className="mb-4 p-3 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
-              {subtitleStatus}
-            </div>
-          )}
-          {errorMessage && (
-            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200">
-              {errorMessage}
-            </div>
-          )}
-          <div className="flex-1">
-            {activeTab === 'chat' ? (
-              <AIChat
-                subtitleData={subtitleData}
-                messages={chatMessages}
-                setMessages={setChatMessages}
-              />
+                )}
+                <video
+                  src={videoUrl}
+                  controls={true}
+                  className="w-full h-full object-contain"
+                  onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                  onLoadedMetadata={(e) => {
+                    setVideoDuration(e.currentTarget.duration);
+                    setVideoLoading(false);
+                    setVideoError('');
+                  }}
+                  onLoadStart={() => setVideoLoading(true)}
+                  onError={() => {
+                    setVideoLoading(false);
+                    setVideoError('无法加载视频文件，请检查文件格式是否正确');
+                  }}
+                />
+              </>
             ) : (
-              <SubtitleList subtitleData={subtitleData} />
+              <div className="flex h-full items-center justify-center text-white">
+                No video URL provided
+              </div>
             )}
+          </div>
+
+          {/* Theme list */}
+          <div className="h-48 lg:h-60 bg-white border-t border-gray-200 p-4 overflow-hidden">
+            <ThemeList
+              currentTime={currentTime}
+              videoDuration={videoDuration}
+              themes={themeData}
+              onSeekTime={(time) => {
+                const videoElement = document.querySelector('video') as globalThis.HTMLVideoElement;
+                if (videoElement) {
+                  videoElement.currentTime = time;
+                  videoElement.play();
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Right side - 35% */}
+        <div className="flex-[0.35] bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col min-w-0">
+          <Tabs activeTab={activeTab} setActiveTab={setActiveTab}>
+            <Tab id="subtitles" label="Subtitles" />
+            <Tab id="chat" label="AI Chat" />
+          </Tabs>
+
+          <div className="flex-1 overflow-auto p-4 min-h-0 flex flex-col">
+            {/* Usage warning */}
+            {usageCount > 2 && (
+              <div className="mb-4 p-3 bg-orange-50 text-orange-700 rounded-lg border border-orange-200">
+                <div className="flex items-center">
+                  <div className="text-2xl mr-2">⚠️</div>
+                  <div>
+                    <p className="font-medium">已超出使用次数，请登录</p>
+                    <p className="text-sm">已使用 {usageCount}/2 次</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Status and error messages */}
+            {subtitleStatus && (
+              <div className="mb-4 p-3 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
+                {subtitleStatus}
+              </div>
+            )}
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200">
+                {errorMessage}
+              </div>
+            )}
+            <div className="flex-1">
+              {activeTab === 'chat' ? (
+                <AIChat
+                  subtitleData={subtitleData}
+                  messages={chatMessages}
+                  setMessages={setChatMessages}
+                />
+              ) : (
+                <SubtitleList subtitleData={subtitleData} />
+              )}
+            </div>
           </div>
         </div>
       </div>

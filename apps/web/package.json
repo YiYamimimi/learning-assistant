@@ -7,19 +7,21 @@
     "build": "next build",
     "start": "next start --port 3000",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:supabase": "tsx scripts/test-supabase.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.100.1",
+    "idb": "^8.0.0",
+    "lucide-react": "^0.454.0",
     "next": "16.2.1",
+    "openai": "^4.58.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "lucide-react": "^0.454.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "idb": "^8.0.0",
-    "openai": "^4.58.1",
-    "supabase": "^1.183.3",
-    "shared": "workspace:*"
+    "shared": "workspace:*",
+    "supabase": "^1.183.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -27,9 +29,11 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
+    "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

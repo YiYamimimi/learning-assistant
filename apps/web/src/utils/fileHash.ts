@@ -8,12 +8,19 @@ export async function calculateFileHash(file: File): Promise<string> {
   return hashHex;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamps?: string[];
+}
+
 export interface VideoMetadata {
   filename: string;
   size: number;
   uploadedAt: number;
-  subtitleData: SubtitleData;
-  themeData: ThemeData;
+  subtitleData: SubtitleData | null;
+  themeData: ThemeData | null;
+  chatMessages: ChatMessage[];
 }
 
 export interface SubtitleData {
@@ -93,6 +100,14 @@ export function saveVideoMetadata(hash: string, metadata: VideoMetadata) {
   localStorage.setItem('videoHashHistory', JSON.stringify(history));
 }
 
+export function updateChatMessages(hash: string, messages: ChatMessage[]) {
+  const history = JSON.parse(localStorage.getItem('videoHashHistory') || '{}');
+  if (history[hash]) {
+    history[hash].chatMessages = messages;
+    localStorage.setItem('videoHashHistory', JSON.stringify(history));
+  }
+}
+
 export function getVideoMetadata(hash: string): VideoMetadata | null {
   const history = JSON.parse(localStorage.getItem('videoHashHistory') || '{}');
   return history[hash] || null;
@@ -104,9 +119,9 @@ export function isVideoUploaded(hash: string): boolean {
 
 export function getUploadHistory(): Array<{ hash: string } & VideoMetadata> {
   const history = JSON.parse(localStorage.getItem('videoHashHistory') || '{}');
-  return Object.entries(history).map(([hash, metadata]: [string, VideoMetadata]) => ({
+  return Object.entries(history).map(([hash, metadata]) => ({
     hash,
-    ...metadata,
+    ...(metadata as VideoMetadata),
   }));
 }
 
@@ -124,8 +139,8 @@ export function cleanExpiredUploads(maxAge: number = 7 * 24 * 60 * 60 * 1000) {
   const history = JSON.parse(localStorage.getItem('videoHashHistory') || '{}');
   const now = Date.now();
 
-  Object.entries(history).forEach(([hash, metadata]: [string, VideoMetadata]) => {
-    if (now - metadata.uploadedAt > maxAge) {
+  Object.entries(history).forEach(([hash, metadata]) => {
+    if (now - (metadata as VideoMetadata).uploadedAt > maxAge) {
       delete history[hash];
     }
   });
