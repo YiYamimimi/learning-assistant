@@ -23,6 +23,8 @@ interface ThemeListProps {
   videoDuration: number;
   onSeekTime: (time: number) => void;
   themes?: VideoTheme[];
+  usageLimitReached?: boolean;
+  usageCount?: number;
 }
 
 export default function ThemeList({
@@ -30,36 +32,13 @@ export default function ThemeList({
   videoDuration,
   onSeekTime,
   themes: externalThemes,
+  usageLimitReached,
+  usageCount,
 }: ThemeListProps) {
-  const [themes, setThemes] = useState<VideoTheme[]>(externalThemes || []);
-  const [isLoading, setIsLoading] = useState(!externalThemes);
-  const [totalVideoTime, setTotalVideoTime] = useState(0);
+  const [themes] = useState<VideoTheme[]>(externalThemes || []);
+  const [isLoading] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (externalThemes) {
-      setThemes(externalThemes);
-      setIsLoading(false);
-      return;
-    }
-
-    fetch('/example/topic.json')
-      .then((response) => response.json())
-      .then((data) => {
-        setThemes(data);
-        setIsLoading(false);
-
-        const lastTheme = data[data.length - 1];
-        if (lastTheme && lastTheme.segments.length > 0) {
-          setTotalVideoTime(lastTheme.segments[lastTheme.segments.length - 1].end);
-        }
-      })
-      .catch((error) => {
-        console.error('Failed to fetch theme data:', error);
-        setIsLoading(false);
-      });
-  }, [externalThemes]);
 
   useEffect(() => {
     const updateWidth = () => {
@@ -171,8 +150,10 @@ export default function ThemeList({
     );
   }
 
+
+
   // Use video duration if available, otherwise fall back to calculated total time
-  const effectiveTotalTime = videoDuration > 0 ? videoDuration : totalVideoTime;
+  const effectiveTotalTime = videoDuration;
   const timeMarkers = generateTimeMarkers(effectiveTotalTime, containerWidth);
 
   return (
@@ -225,11 +206,17 @@ export default function ThemeList({
       </div>
 
       {/* Theme list */}
-      <div className="flex-1 overflow-auto">
+      {(usageLimitReached && themes.length === 0) ? (<div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="text-2xl mb-2">⚠️</div>
+          <p className="font-medium text-orange-700">已超出使用次数，请登录</p>
+          <p className="text-sm text-gray-400">已使用 {usageCount}/2 次</p>
+        </div>
+      </div>) : (<div className="flex-1 overflow-auto">
         <div className="space-y-1">
-          {themes.map((theme, index) => {
+          {themes.length > 0 ?
+           (themes.map((theme, index) => {
             const { start } = parseTimestamp(theme.quote.timestamp);
-
             return (
               <div
                 key={theme.id}
@@ -251,9 +238,12 @@ export default function ThemeList({
                 </div>
               </div>
             );
-          })}
+          })) : 
+          (<div className="flex items-center justify-center h-full text-gray-400 text-sm">暂无主题</div>
+          )}
+
         </div>
-      </div>
+      </div>)}
     </div>
   );
 }

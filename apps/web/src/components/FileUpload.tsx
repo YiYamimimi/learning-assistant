@@ -1,7 +1,7 @@
 'use client';
 
 /* global sessionStorage */
-
+import { useToast } from '@/components/Toast';
 import { useRef, useState, useEffect } from 'react';
 import React from 'react';
 import { useRouter } from 'next/navigation';
@@ -107,11 +107,16 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
         console.log('主题数据:', themeData);
 
         try {
-          await fetch('/api/record-usage', {
-            method: 'POST',
-          });
-          console.log('用户使用情况已记录');
-          setUsageCount((prev) => prev + 1);
+          if (usageCount < 2) {
+            await fetch('/api/record-usage', {
+              method: 'POST',
+            });
+            console.log('用户使用情况已记录');
+            setUsageCount((prev) => prev + 1);
+            sessionStorage.setItem('usageRecorded', 'true');
+          } else {
+            console.log('已达到使用次数限制，不记录使用情况');
+          }
         } catch (usageError) {
           console.error('记录用户使用情况失败:', usageError);
         }
@@ -126,23 +131,22 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
     }
   };
 
-  const handleTryNow = async () => {
-    try {
-      await fetch('/api/record-usage', {
-        method: 'POST',
-      });
-      console.log('示例使用情况已记录');
-      setUsageCount((prev) => prev + 1);
-    } catch (usageError) {
-      console.error('记录示例使用情况失败:', usageError);
-    }
+  const handleTryNow = () => {
     window.location.href = '/video?example=true';
   };
+  const [flashBtn, setFlashBtn] = useState(false);
+  const { showToast } = useToast();
+  const chooseVideo=()=>{
+    showToast('上传视频正在升级，可以点击立即体验哦！', 'info');
+    setFlashBtn(true);
+    setTimeout(() => setFlashBtn(false), 3000);
+    videoInputRef.current?.click()
+  }
 
   return (
     <div className="w-full max-w-2xl space-y-6">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">LongCut</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">AI辅助学习助手</h1>
         <p className="text-gray-500">The best way to learn from long videos.</p>
       </div>
 
@@ -167,9 +171,10 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
               <>
                 <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <p className="text-sm text-gray-600 mb-2">点击或拖拽上传视频文件</p>
-                <p className="text-xs text-gray-400">支持 MP4, WebM, AVI 等格式</p>
+                <p className="text-xs text-gray-400">支持mp3、mp4、wav、ogg格式</p>
+                <p className="text-xs text-gray-400">音频应该小于 500MB，且时长小于 3 小时</p>
                 {!loadingUsage && (
-                  <p className="text-xs text-purple-600 mb-4">
+                  <p className="text-xs text-purple-600 m-4">
                     已使用 {usageCount}/{maxUsage} 次
                   </p>
                 )}
@@ -181,7 +186,7 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
                   className="hidden"
                 />
                 <button
-                  onClick={() => videoInputRef.current?.click()}
+                  onClick={chooseVideo}
                   className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                 >
                   选择视频文件
@@ -210,18 +215,16 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
           <div className="text-center">
             <h3 className="text-lg font-bold text-purple-900 mb-2">立即体验</h3>
             <p className="text-sm text-purple-700 mb-2">使用示例内容快速体验 LongCut 的强大功能</p>
-            {!loadingUsage && (
-              <p className="text-xs text-purple-600 mb-4">
-                已使用 {usageCount}/{maxUsage} 次
-              </p>
-            )}
+        
             <button
               onClick={handleTryNow}
               disabled={loadingUsage}
               className={`px-8 py-3 bg-gradient-to-r text-white rounded-lg transition-all shadow-md font-semibold text-lg flex items-center justify-center mx-auto ${
                 loadingUsage
                   ? 'from-gray-400 to-gray-500 cursor-not-allowed'
-                  : 'from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600'
+                  : flashBtn
+                    ? 'from-purple-500 to-pink-500 animate-pulse-ring'
+                    : 'from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600'
               }`}
             >
               <Play className="h-5 w-5 mr-2" />

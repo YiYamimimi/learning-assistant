@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import {
+  getGuestAccessState,
+  getAiUsageCount,
+  recordAiUsage,
+} from '@/lib/guest-usage';
+
+const AI_USAGE_LIMIT = 3;
 
 /* global TextEncoder, ReadableStream */
 
@@ -10,6 +17,13 @@ const client = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
+    const guestState = await getGuestAccessState();
+    const aiUsageCount = await getAiUsageCount(guestState.identifiers);
+
+    if (aiUsageCount >= AI_USAGE_LIMIT) {
+      return NextResponse.json({ error: 'AI聊天次数已使用完毕，请登录' }, { status: 429 });
+    }
+
     const { messages, subtitleData, currentQuestion } = await request.json();
 
     if (!messages || !Array.isArray(messages)) {
@@ -160,6 +174,13 @@ export async function POST(request: NextRequest) {
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
+          
+          // 记录AI聊天使用次数
+           try {
+             await recordAiUsage(guestState.identifiers);
+           } catch (error) {
+             console.error('记录AI聊天使用次数失败:', error);
+           }
         } catch (error) {
           console.error('Stream error:', error);
           controller.error(error);

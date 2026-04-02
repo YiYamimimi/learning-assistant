@@ -1,10 +1,9 @@
 'use client';
 
-/* global alert */
-
 import { useState, useEffect } from 'react';
 import { getUploadHistory } from '@/utils/fileHash';
 import { videoStorage } from '@/utils/videoStorage';
+import { useToast } from './Toast';
 
 interface HistoryPanelProps {
   isOpen: boolean;
@@ -19,6 +18,7 @@ export default function HistoryPanel({
   onSelectHistory,
   currentVideoHash,
 }: HistoryPanelProps) {
+  const { showToast } = useToast();
   const [history, setHistory] = useState<Array<{ hash: string } & any>>([]);
   const [loading, setLoading] = useState(false);
   const [loadingHash, setLoadingHash] = useState<string>('');
@@ -40,11 +40,11 @@ export default function HistoryPanel({
         const videoUrl = URL.createObjectURL(video);
         onSelectHistory(hash, filename, videoUrl);
       } else {
-        alert('视频文件未找到，请重新上传');
+        showToast('视频文件未找到，请重新上传', 'error');
       }
     } catch (error) {
       console.error('加载视频失败:', error);
-      alert('加载视频失败，请重试');
+      showToast('加载视频失败，请重试', 'error');
     } finally {
       setLoading(false);
       setLoadingHash('');

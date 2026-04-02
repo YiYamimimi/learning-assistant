@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import MarkdownWithTimestamps from './MarkdownWithTimestamps';
+import { useToast } from './Toast';
 
 /* global TextDecoder */
 
@@ -22,9 +23,14 @@ interface AIChatProps {
   subtitleData: any;
   messages: Message[];
   setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
+  disable: boolean;
+  aiUsageCount: number;
+  aiUsageLimitReached?: boolean;
+  onAiUsageUpdate?: (count: number, limitReached: boolean, latestMessages: Message[]) => void;
 }
 
-export default function AIChat({ subtitleData, messages, setMessages }: AIChatProps) {
+export default function AIChat({ subtitleData, messages, setMessages, disable, aiUsageCount, onAiUsageUpdate }: AIChatProps) {
+  const { showToast } = useToast();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [relevantChunks, setRelevantChunks] = useState<RelevantChunk[]>([]);
@@ -32,7 +38,7 @@ export default function AIChat({ subtitleData, messages, setMessages }: AIChatPr
 
   const PRESET_QUESTIONS = [
     '这个视频的主要观点是什么?',
-    '这个视频有哪些经常片段?',
+    '这个视频有哪些精彩片段?',
     '这个视频中最精彩的语录是什么?',
   ];
 
@@ -58,9 +64,14 @@ export default function AIChat({ subtitleData, messages, setMessages }: AIChatPr
   const sendMessage = async (presetQuestion?: string) => {
     const messageToSend = presetQuestion || input.trim();
     if (!messageToSend || isLoading) return;
-
+    if (!subtitleData || subtitleData.length === 0) {
+      showToast('没有字幕无法使用AI聊天', 'warning');
+      return;
+    }
     if (!presetQuestion) {
       setInput('');
+      showToast('请输入问题', 'warning');
+      return ;
     }
     setMessages((prev) => [...prev, { role: 'user', content: messageToSend }]);
     setIsLoading(true);
@@ -78,10 +89,10 @@ export default function AIChat({ subtitleData, messages, setMessages }: AIChatPr
       const cleanSubtitleData =
         subtitleData && Array.isArray(subtitleData)
           ? subtitleData.map((item: any) => ({
-              from: item.from,
-              to: item.to,
-              content: item.content,
-            }))
+            from: item.from,
+            to: item.to,
+            content: item.content,
+          }))
           : null;
 
       const response = await fetch('/api/chat', {
@@ -142,6 +153,18 @@ export default function AIChat({ subtitleData, messages, setMessages }: AIChatPr
         }
       }
 
+      if (onAiUsageUpdate) {
+        try {
+          const res = await fetch('/api/record-ai-usage', { method: 'POST' });
+          const data = await res.json();
+          if (data.success) {
+            onAiUsageUpdate(data.usageCount, data.used,messages);
+          }
+        } catch (e) {
+          console.error('更新AI使用次数失败:', e);
+        }
+      }
+
       if (subtitleData && Array.isArray(subtitleData)) {
         const mockChunks: RelevantChunk[] = subtitleData
           .slice(0, 3)
@@ -178,6 +201,7 @@ export default function AIChat({ subtitleData, messages, setMessages }: AIChatPr
             {PRESET_QUESTIONS.map((question, index) => (
               <button
                 key={index}
+                disabled={disable || isLoading}
                 onClick={() => sendMessage(question)}
                 className="px-5 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-full text-gray-700 text-sm transition-colors border border-gray-200"
               >
@@ -187,7 +211,9 @@ export default function AIChat({ subtitleData, messages, setMessages }: AIChatPr
           </div>
         }
 
-        {!isLoading &&
+
+
+        {
           messages.map((msg, index) => (
             <div
               key={index}
@@ -196,7 +222,7 @@ export default function AIChat({ subtitleData, messages, setMessages }: AIChatPr
               <div
                 className={`max-w-[80%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}
               >
-                {msg.role === 'assistant' ? (
+                {(msg.role === 'assistant' )? (msg.content!==''&&
                   <MarkdownWithTimestamps
                     content={msg.content}
                     onTimestampClick={handleTimestampClick}
@@ -231,6 +257,17 @@ export default function AIChat({ subtitleData, messages, setMessages }: AIChatPr
         )}
 
         <div ref={messagesEndRef} />
+        {aiUsageCount >= 3 && (
+          <div className=" p-3 bg-orange-50 text-orange-700 rounded-lg border border-orange-200">
+            <div className="flex items-center">
+              <div className="text-2xl mr-2">⚠️</div>
+              <div>
+                <p className="font-medium">AI聊天次数已使用完毕，请登录</p>
+                <p className="text-sm">已使用 {aiUsageCount}/3 次</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex border-t border-gray-200 pt-2 ">
@@ -245,7 +282,7 @@ export default function AIChat({ subtitleData, messages, setMessages }: AIChatPr
         />
         <button
           onClick={() => sendMessage()}
-          disabled={isLoading || !input.trim()}
+          disabled={isLoading || !input.trim() || disable}
           className="px-4 py-2 bg-blue-500 text-white rounded-r-lg hover:bg-blue-600 disabled:bg-gray-300"
         >
           发送

@@ -7,6 +7,7 @@ const GUEST_TOKEN_COOKIE = 'learning_assistant_guest_token';
 const GUEST_USED_COOKIE = 'learning_assistant_analysis_used';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365 * 5;
 const GUEST_RATE_KEY = 'guest-analysis';
+
 const MAX_USAGE_COUNT = 2;
 
 export type GuestAccessState = {
@@ -30,6 +31,8 @@ async function getIpHash(): Promise<string | null> {
 
 export async function getGuestAccessState(options?: {
   supabase?: ReturnType<typeof createClient>;
+  key?: string;
+  maxUsage?: number;
 }): Promise<GuestAccessState> {
   const supabase =
     options?.supabase ??
@@ -52,24 +55,27 @@ export async function getGuestAccessState(options?: {
   const usedCookie = cookieStore.get(GUEST_USED_COOKIE)?.value === '1';
   let used = usedCookie;
   let usageCount = 0;
+  
+  const rateKey = options?.key || GUEST_RATE_KEY;
+  const maxUsage = options?.maxUsage || MAX_USAGE_COUNT;
 
-  if (!used) {
-    const { data, error } = await supabase
-      .from('rate_limits')
-      .select('usage_count')
-      .eq('key', GUEST_RATE_KEY)
-      .in('identifier', identifiers)
-      .returns<{ usage_count: number }[]>();
+  const { data, error } = await supabase
+    .from('rate_limits')
+    .select('usage_count')
+    .eq('key', rateKey)
+    .in('identifier', identifiers)
+    .returns<{ usage_count: number }[]>();
 
-    if (error) {
-      console.error('Failed to read guest usage:', error);
-    }
-
-    if (data && data.length > 0) {
-      usageCount = Math.max(...data.map((item) => item.usage_count || 0));
-      used = usageCount >= MAX_USAGE_COUNT;
-    }
+  if (error) {
+    console.error('Failed to read guest usage:', error);
   }
+
+  if (data && data.length > 0) {
+      usageCount = Math.max(...data.map((item) => item.usage_count || 0));
+      if (!used) {
+        used = usageCount >= maxUsage;
+      }
+    }
 
   return {
     token,
@@ -104,7 +110,7 @@ export function setGuestCookies(
 
 export async function recordGuestUsage(
   state: GuestAccessState,
-  options?: { supabase?: ReturnType<typeof createClient> }
+  options?: { supabase?: ReturnType<typeof createClient>; key?: string }
 ): Promise<void> {
   const supabase =
     options?.supabase ??
@@ -120,7 +126,7 @@ export async function recordGuestUsage(
     console.log(`处理标识符: ${identifier}`);
 
     const { data, error } = await supabase.rpc('increment_usage_count', {
-      p_key: GUEST_RATE_KEY,
+      p_key: options?.key || GUEST_RATE_KEY,
       p_identifier: identifier,
     });
 
@@ -206,4 +212,102 @@ export async function updateUsageCount(
 
   console.log(`成功更新所有记录，新的 usage_count: ${newCount}`);
   return { success: true };
+}
+
+export async function getAiUsageCount(
+  identifiers: string[],
+  options?: { supabase?: ReturnType<typeof createClient> }
+): Promise<number> {
+  const supabase =
+    options?.supabase ??
+    createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    );
+
+  const { data, error } = await supabase
+    .from('rate_limits')
+    .select('use_ai')
+    .eq('key', GUEST_RATE_KEY)
+    .in('identifier', identifiers)
+    .returns<{ use_ai: number }[]>();
+
+  if (error) {
+    console.error('Failed to read AI usage:', error);
+    return 0;
+  }
+
+  if (data && data.length > 0) {
+    return Math.max(...data.map((item) => item.use_ai || 0));
+  }
+
+  return 0;
+}
+
+export async function recordAiUsage(
+  identifiers: string[],
+  options?: { supabase?: ReturnType<typeof createClient> }
+): Promise<number> {
+  const supabase =
+    options?.supabase ??
+    createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    );
+
+  const uniqueIdentifiers = Array.from(new Set(identifiers));
+  let maxNewCount = 0;
+
+  for (const identifier of uniqueIdentifiers) {
+    const { data: existing, error: queryError } = await supabase
+      .from('rate_limits')
+      .select('use_ai')
+      .eq('key', GUEST_RATE_KEY)
+      .eq('identifier', identifier)
+      .returns<{ use_ai: number }[]>()
+      .maybeSingle();
+
+    if (queryError) {
+      console.error('Failed to query use_ai:', queryError);
+      continue;
+    }
+
+    let newCount: number;
+
+    if (existing) {
+      newCount = (existing.use_ai || 0) + 1;
+      const { error: updateError } = await supabase
+        .from('rate_limits')
+        .update({ use_ai: newCount, timestamp: new Date().toISOString() })
+        .eq('key', GUEST_RATE_KEY)
+        .eq('identifier', identifier);
+
+      if (updateError) {
+        console.error('Failed to update use_ai:', updateError);
+        continue;
+      }
+    } else {
+      newCount = 1;
+      const { error: insertError } = await supabase
+        .from('rate_limits')
+        .insert({
+          key: GUEST_RATE_KEY,
+          identifier,
+          usage_count: 0,
+          use_ai: 1,
+          timestamp: new Date().toISOString(),
+        });
+
+      if (insertError) {
+        console.error('Failed to insert use_ai:', insertError);
+        continue;
+      }
+    }
+
+    if (newCount > maxNewCount) {
+      maxNewCount = newCount;
+    }
+  }
+
+  return maxNewCount;
 }

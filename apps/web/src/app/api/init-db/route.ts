@@ -37,6 +37,33 @@ export async function POST() {
       $$ LANGUAGE plpgsql SECURITY DEFINER;
     `;
 
+    const incrementAiFunction = `
+      CREATE OR REPLACE FUNCTION increment_use_ai(
+        p_key TEXT,
+        p_identifier TEXT
+      )
+      RETURNS INTEGER AS $$
+      DECLARE
+        v_new_count INTEGER;
+      BEGIN
+        UPDATE rate_limits
+        SET 
+          use_ai = COALESCE(use_ai, 0) + 1,
+          timestamp = NOW()
+        WHERE key = p_key AND identifier = p_identifier
+        RETURNING use_ai INTO v_new_count;
+
+        IF NOT FOUND THEN
+          INSERT INTO rate_limits (key, identifier, usage_count, use_ai, timestamp)
+          VALUES (p_key, p_identifier, 0, 1, NOW())
+          RETURNING use_ai INTO v_new_count;
+        END IF;
+
+        RETURN v_new_count;
+      END;
+      $$ LANGUAGE plpgsql SECURITY DEFINER;
+    `;
+
     const { error: incrementError } = await supabase.rpc('exec_sql', { sql: incrementFunction });
 
     if (incrementError) {
@@ -58,7 +85,7 @@ export async function POST() {
           {
             success: false,
             message: '请手动在 Supabase Dashboard 中执行 SQL',
-            sql: incrementFunction,
+            sql: incrementFunction + '\n\n' + incrementAiFunction,
           },
           { status: 200 }
         );
@@ -66,6 +93,20 @@ export async function POST() {
         console.error('数据库测试异常:', dbError);
         return NextResponse.json({ error: '数据库测试失败' }, { status: 500 });
       }
+    }
+
+    const { error: aiIncrementError } = await supabase.rpc('exec_sql', { sql: incrementAiFunction });
+
+    if (aiIncrementError) {
+      console.error('创建 increment_use_ai 函数失败:', aiIncrementError);
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'increment_usage_count 创建成功，但 increment_use_ai 创建失败，请手动执行',
+          sql: incrementAiFunction,
+        },
+        { status: 200 }
+      );
     }
 
     console.log('数据库函数初始化完成');

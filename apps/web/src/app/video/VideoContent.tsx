@@ -8,6 +8,7 @@ import SubtitleList from '@/components/SubtitleList';
 import ThemeList from '@/components/ThemeList';
 import HistoryPanel from '@/components/HistoryPanel';
 import Navbar from '@/components/Navbar';
+import { useToast } from '@/components/Toast';
 import { getVideoMetadata, updateChatMessages } from '@/utils/fileHash';
 
 /* global sessionStorage */
@@ -41,6 +42,7 @@ interface VideoTheme {
 }
 
 export default function VideoContent() {
+  const { showToast } = useToast();
   const searchParams = useSearchParams();
   const localVideo = searchParams.get('localVideo');
   console.log(localVideo, 'localVideo');
@@ -65,6 +67,8 @@ export default function VideoContent() {
   const [currentVideoHash, setCurrentVideoHash] = useState<string>('');
   const [usageLimitReached, setUsageLimitReached] = useState(false);
   const [usageCount, setUsageCount] = useState(0);
+  const [aiUsageLimitReached, setAiUsageLimitReached] = useState(false);
+  const [aiUsageCount, setAiUsageCount] = useState(0);
   const hasRecordedUsageRef = useRef(false);
   const isRecordingRef = useRef(false);
 
@@ -78,15 +82,35 @@ export default function VideoContent() {
     ]);
   };
 
+  const usageLimitReachedRef = useRef(false);
+
   const recordUsage = useCallback(async () => {
-    if (hasRecordedUsageRef.current || usageLimitReached || isRecordingRef.current) {
+    if (sessionStorage.getItem('usageRecorded') === 'true') {
+      sessionStorage.removeItem('usageRecorded');
+      console.log('使用情况已在上一页记录，跳过');
+      return;
+    }
+
+    if (hasRecordedUsageRef.current || usageLimitReachedRef.current || isRecordingRef.current) {
       return;
     }
 
     isRecordingRef.current = true;
-    hasRecordedUsageRef.current = true;
 
     try {
+      const checkResponse = await fetch('/api/record-usage');
+      const checkData = await checkResponse.json();
+
+      if (checkData.used) {
+        usageLimitReachedRef.current = true;
+        setUsageLimitReached(true);
+        setUsageCount(checkData.usageCount || 0);
+        console.log('已达到使用限制，跳过记录');
+        return;
+      }
+
+      hasRecordedUsageRef.current = true;
+
       const response = await fetch('/api/record-usage', {
         method: 'POST',
       });
@@ -96,6 +120,7 @@ export default function VideoContent() {
       if (data.success) {
         setUsageCount(data.usageCount);
         setUsageLimitReached(data.used);
+        usageLimitReachedRef.current = data.used;
         console.log('使用情况已记录:', data);
       }
     } catch (error) {
@@ -104,7 +129,29 @@ export default function VideoContent() {
     } finally {
       isRecordingRef.current = false;
     }
-  }, [usageLimitReached]);
+  }, []);
+
+  useEffect(() => {
+    const checkUsageStatus = async () => {
+      try {
+        const response = await fetch('/api/record-usage');
+        const data = await response.json();
+        setUsageLimitReached(data.used);
+        setUsageCount(data.usageCount || 0);
+        usageLimitReachedRef.current = data.used;
+        
+        // 检查AI聊天使用次数
+        const aiUsageResponse = await fetch('/api/record-ai-usage');
+        const aiUsageData = await aiUsageResponse.json();
+        setAiUsageLimitReached(aiUsageData.used);
+        setAiUsageCount(aiUsageData.usageCount || 0);
+      } catch (error) {
+        console.error('检查使用状态失败:', error);
+      }
+    };
+
+    checkUsageStatus();
+  }, []);
 
   const loadLocalSubtitle = useCallback(async (subtitleName: string) => {
     try {
@@ -138,6 +185,19 @@ export default function VideoContent() {
       setErrorMessage(`加载本地字幕失败: ${error instanceof Error ? error.message : '未知错误'}`);
       setSubtitleStatus('');
       getMockData();
+    }
+  }, []);
+
+  const loadExampleTheme = useCallback(async () => {
+    try {
+      const response = await fetch('/example/topic.json');
+      if (!response.ok) {
+        throw new Error(`Failed to load example theme: ${response.status}`);
+      }
+      const data = await response.json();
+      setThemeData(data);
+    } catch (error) {
+      console.error('加载示例主题失败:', error);
     }
   }, []);
 
@@ -179,28 +239,19 @@ export default function VideoContent() {
     const newVideoId = localVideo || example || '';
     if (newVideoId !== currentVideoId) {
       setCurrentVideoId(newVideoId);
-      setChatMessages([]);
+      // 立即体验视频不要清空聊天记录，以便从 localStorage 恢复
+      if (!example) {
+        setChatMessages([]);
+      }
       hasRecordedUsageRef.current = false;
       isRecordingRef.current = false;
     }
-
-    const checkUsageStatus = async () => {
-      try {
-        const response = await fetch('/api/record-usage');
-        const data = await response.json();
-        setUsageLimitReached(data.used);
-        setUsageCount(data.usageCount || 0);
-      } catch (error) {
-        console.error('检查使用状态失败:', error);
-      }
-    };
-
-    checkUsageStatus();
 
     if (example) {
       setIsLocalVideo(true);
       setVideoUrl('/example/videoplayback.mp4');
       loadExampleSubtitle();
+      loadExampleTheme();
     } else if (localVideo) {
       setIsLocalVideo(true);
       const storedVideoUrl = sessionStorage.getItem('localVideoUrl');
@@ -220,7 +271,7 @@ export default function VideoContent() {
         if (metadata) {
           console.log('找到视频元数据:', metadata);
 
-          if (!usageLimitReached && metadata.subtitleData && metadata.themeData) {
+          if (!usageLimitReachedRef.current && metadata.subtitleData && metadata.themeData) {
             const subtitleItems = metadata.subtitleData.resp.utterances.map((ut) => ({
               from: ut.start_time / 1000,
               to: ut.end_time / 1000,
@@ -263,9 +314,9 @@ export default function VideoContent() {
     example,
     loadLocalSubtitle,
     loadExampleSubtitle,
+    loadExampleTheme,
     currentVideoId,
     recordUsage,
-    usageLimitReached,
   ]);
 
   const parseSRT = (srtContent: string): SubtitleItem[] => {
@@ -353,18 +404,43 @@ export default function VideoContent() {
     return subtitles;
   };
 
+  const EXAMPLE_CHAT_KEY = 'exampleChatMessages';
+
+  useEffect(() => {
+    if (example && typeof window !== 'undefined') {
+      const saved = localStorage.getItem(EXAMPLE_CHAT_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setChatMessages(parsed);
+          }
+        } catch {
+          console.error('解析立即体验聊天记录失败');
+        }
+      }
+    }
+  }, [example, currentVideoId]);
+
+
   useEffect(() => {
     if (currentVideoHash && chatMessages.length > 0 && !usageLimitReached) {
       updateChatMessages(currentVideoHash, chatMessages);
     }
   }, [chatMessages, currentVideoHash, usageLimitReached]);
 
+  useEffect(() => {
+    if (example && chatMessages.length > 0 && typeof window !== 'undefined') {
+      localStorage.setItem(EXAMPLE_CHAT_KEY, JSON.stringify(chatMessages));
+    }
+  }, [chatMessages, example]);
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Navbar
         onBack={() => (window.location.href = '/')}
         onHistory={() => setIsHistoryPanelOpen(true)}
-        onLogin={() => console.log('登录功能待实现')}
+        onLogin={() => showToast('登录功能正在升级中，敬请期待！', 'info', 'top-right')}
       />
 
       <HistoryPanel
@@ -380,7 +456,7 @@ export default function VideoContent() {
 
           const metadata = getVideoMetadata(hash);
           if (metadata) {
-            if (!usageLimitReached && metadata.subtitleData && metadata.themeData) {
+            if (metadata.subtitleData && metadata.themeData) {
               const subtitleItems = metadata.subtitleData.resp.utterances.map((ut) => ({
                 from: ut.start_time / 1000,
                 to: ut.end_time / 1000,
@@ -396,8 +472,6 @@ export default function VideoContent() {
                 segments: theme.segments,
               }));
               setThemeData(themes);
-
-              recordUsage();
             }
 
             if (metadata.chatMessages && metadata.chatMessages.length > 0) {
@@ -462,6 +536,8 @@ export default function VideoContent() {
               currentTime={currentTime}
               videoDuration={videoDuration}
               themes={themeData}
+              usageLimitReached={usageCount >= 2}
+              usageCount={usageCount}
               onSeekTime={(time) => {
                 const videoElement = document.querySelector('video') as globalThis.HTMLVideoElement;
                 if (videoElement) {
@@ -482,7 +558,7 @@ export default function VideoContent() {
 
           <div className="flex-1 overflow-auto p-4 min-h-0 flex flex-col">
             {/* Usage warning */}
-            {usageCount > 2 && (
+            {usageCount >= 2 && (
               <div className="mb-4 p-3 bg-orange-50 text-orange-700 rounded-lg border border-orange-200">
                 <div className="flex items-center">
                   <div className="text-2xl mr-2">⚠️</div>
@@ -511,7 +587,28 @@ export default function VideoContent() {
                   subtitleData={subtitleData}
                   messages={chatMessages}
                   setMessages={setChatMessages}
+                  disable={aiUsageLimitReached || (usageCount >= 2 && !subtitleData)}
+                  aiUsageCount={aiUsageCount}
+                  aiUsageLimitReached={aiUsageLimitReached}
+                  onAiUsageUpdate={(count, limitReached, latestMessages) => {
+                    setAiUsageCount(count);
+                    setAiUsageLimitReached(limitReached);
+                    if (latestMessages && example && typeof window !== 'undefined') {
+                      localStorage.setItem(EXAMPLE_CHAT_KEY, JSON.stringify(latestMessages));
+                    }
+                  }}
                 />
+              ) : usageCount >= 2 && !subtitleData ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                      </svg>
+                    </div>
+                    <p className="font-medium text-gray-500">暂无数据</p>
+                  </div>
+                </div>
               ) : (
                 <SubtitleList subtitleData={subtitleData} />
               )}
