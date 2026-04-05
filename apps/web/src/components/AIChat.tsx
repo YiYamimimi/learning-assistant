@@ -6,6 +6,8 @@ import { useToast } from './Toast';
 
 /* global TextDecoder */
 
+/* global localStorage */
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -24,12 +26,21 @@ interface AIChatProps {
   messages: Message[];
   setMessages: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
   disable: boolean;
+  isExample: any;
   aiUsageCount: number;
   aiUsageLimitReached?: boolean;
-  onAiUsageUpdate?: (count: number, limitReached: boolean, latestMessages: Message[]) => void;
+  onAiUsageUpdate?: (count: number, limitReached: boolean) => void;
 }
 
-export default function AIChat({ subtitleData, messages, setMessages, disable, aiUsageCount, onAiUsageUpdate }: AIChatProps) {
+export default function AIChat({
+  subtitleData,
+  messages,
+  setMessages,
+  disable,
+  isExample,
+  aiUsageCount,
+  onAiUsageUpdate,
+}: AIChatProps) {
   const { showToast } = useToast();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -64,19 +75,19 @@ export default function AIChat({ subtitleData, messages, setMessages, disable, a
   const sendMessage = async (presetQuestion?: string) => {
     const messageToSend = presetQuestion || input.trim();
     if (!messageToSend || isLoading) return;
-    if (!subtitleData || subtitleData.length === 0) {
+    if (disable) {
       showToast('没有字幕无法使用AI聊天', 'warning');
       return;
     }
     if (!presetQuestion) {
-      setInput('');
+      // setInput('');
       showToast('请输入问题', 'warning');
-      return ;
+      return;
     }
     setMessages((prev) => [...prev, { role: 'user', content: messageToSend }]);
     setIsLoading(true);
     setRelevantChunks([]);
-
+    setInput('');
     setMessages((prev) => [
       ...prev,
       {
@@ -89,10 +100,10 @@ export default function AIChat({ subtitleData, messages, setMessages, disable, a
       const cleanSubtitleData =
         subtitleData && Array.isArray(subtitleData)
           ? subtitleData.map((item: any) => ({
-            from: item.from,
-            to: item.to,
-            content: item.content,
-          }))
+              from: item.from,
+              to: item.to,
+              content: item.content,
+            }))
           : null;
 
       const response = await fetch('/api/chat', {
@@ -158,7 +169,47 @@ export default function AIChat({ subtitleData, messages, setMessages, disable, a
           const res = await fetch('/api/record-ai-usage', { method: 'POST' });
           const data = await res.json();
           if (data.success) {
-            onAiUsageUpdate(data.usageCount, data.used,messages);
+            onAiUsageUpdate(data.usageCount, data.used);
+            console.log('加数据成功');
+
+            // 累积记录AI聊天记录到对应的视频文件中
+            try {
+              if (isExample) {
+                console.log('存数据');
+
+                const { addMessageToExampleChat } = await import('@/utils/fileHash');
+
+                addMessageToExampleChat({
+                  role: 'user',
+                  content: messageToSend,
+                });
+
+                // 添加AI回复到视频记录
+                addMessageToExampleChat({
+                  role: 'assistant',
+                  content: fullContent,
+                });
+              }
+              // 获取当前视频的哈希值
+              const currentVideoHash = localStorage.getItem('currentVideoHash');
+              if (currentVideoHash) {
+                // 添加用户消息到视频记录
+                const { addChatMessageToVideo } = await import('@/utils/fileHash');
+                addChatMessageToVideo(currentVideoHash, {
+                  role: 'user',
+                  content: messageToSend,
+                });
+
+                // 添加AI回复到视频记录
+                addChatMessageToVideo(currentVideoHash, {
+                  role: 'assistant',
+                  content: fullContent,
+                });
+                console.log('AI聊天记录已保存到视频:', currentVideoHash);
+              }
+            } catch (saveError) {
+              console.error('保存AI聊天记录失败:', saveError);
+            }
           }
         } catch (e) {
           console.error('更新AI使用次数失败:', e);
@@ -211,28 +262,28 @@ export default function AIChat({ subtitleData, messages, setMessages, disable, a
           </div>
         }
 
-
-
-        {
-          messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+        {messages.map(
+          (msg, index) =>
+            msg.content !== '' && (
               <div
-                className={`max-w-[80%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}
+                key={index}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                {(msg.role === 'assistant' )? (msg.content!==''&&
-                  <MarkdownWithTimestamps
-                    content={msg.content}
-                    onTimestampClick={handleTimestampClick}
-                  />
-                ) : (
-                  msg.content
-                )}
+                <div
+                  className={`max-w-[80%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}
+                >
+                  {msg.role === 'assistant' ? (
+                    <MarkdownWithTimestamps
+                      content={msg.content}
+                      onTimestampClick={handleTimestampClick}
+                    />
+                  ) : (
+                    msg.content
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+        )}
 
         {isLoading && (
           <div className="flex justify-start">
@@ -275,13 +326,13 @@ export default function AIChat({ subtitleData, messages, setMessages, disable, a
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          onKeyPress={(e) => e.key === 'Enter' && sendMessage(input)}
           placeholder="输入问题..."
           disabled={isLoading}
           className="flex-1 p-2 border border-gray-300 rounded-l-lg focus:outline-none text-gray-500 focus:border-gray-400"
         />
         <button
-          onClick={() => sendMessage()}
+          onClick={() => sendMessage(input)}
           disabled={isLoading || !input.trim() || disable}
           className="px-4 py-2 bg-blue-500 text-white rounded-r-lg hover:bg-blue-600 disabled:bg-gray-300"
         >

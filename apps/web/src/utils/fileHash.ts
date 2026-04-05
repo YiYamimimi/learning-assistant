@@ -147,3 +147,146 @@ export function cleanExpiredUploads(maxAge: number = 7 * 24 * 60 * 60 * 1000) {
 
   localStorage.setItem('videoHashHistory', JSON.stringify(history));
 }
+
+// 新增函数：更新视频历史列表
+export function updateVideoHistory(hash: string, metadata: VideoMetadata) {
+  const videoHistory = JSON.parse(localStorage.getItem('videoHistoryList') || '[]');
+
+  // 检查是否已存在
+  const existingIndex = videoHistory.findIndex((item: any) => item.hash === hash);
+
+  if (existingIndex >= 0) {
+    // 更新现有记录
+    videoHistory[existingIndex] = {
+      hash,
+      filename: metadata.filename,
+      uploadedAt: metadata.uploadedAt,
+      lastAccessed: Date.now(),
+      accessCount: (videoHistory[existingIndex].accessCount || 0) + 1,
+    };
+  } else {
+    // 添加新记录
+    videoHistory.unshift({
+      hash,
+      filename: metadata.filename,
+      uploadedAt: metadata.uploadedAt,
+      lastAccessed: Date.now(),
+      accessCount: 1,
+    });
+  }
+
+  // 保持列表长度（最多保留10个）
+  const trimmedHistory = videoHistory.slice(0, 10);
+  localStorage.setItem('videoHistoryList', JSON.stringify(trimmedHistory));
+}
+
+// 新增函数：获取视频历史列表
+export function getVideoHistory() {
+  return JSON.parse(localStorage.getItem('videoHistoryList') || '[]');
+}
+
+// 新增函数：添加AI聊天记录到指定视频
+export function addChatMessageToVideo(hash: string, message: ChatMessage) {
+  const history = JSON.parse(localStorage.getItem('videoHashHistory') || '{}');
+
+  if (history[hash]) {
+    if (!history[hash].chatMessages) {
+      history[hash].chatMessages = [];
+    }
+
+    // 添加时间戳
+    const messageWithTimestamp = {
+      ...message,
+      timestamp: Date.now(),
+    };
+
+    history[hash].chatMessages.push(messageWithTimestamp);
+    localStorage.setItem('videoHashHistory', JSON.stringify(history));
+
+    // 更新访问记录
+    updateVideoAccess(hash);
+
+    return true;
+  }
+
+  return false;
+}
+
+// 新增函数：更新视频访问记录
+export function updateVideoAccess(hash: string) {
+  const history = JSON.parse(localStorage.getItem('videoHashHistory') || '{}');
+
+  if (history[hash]) {
+    history[hash].lastAccessed = Date.now();
+    history[hash].accessCount = (history[hash].accessCount || 0) + 1;
+    localStorage.setItem('videoHashHistory', JSON.stringify(history));
+
+    // 同时更新历史列表
+    const videoHistory = JSON.parse(localStorage.getItem('videoHistoryList') || '[]');
+    const existingIndex = videoHistory.findIndex((item: any) => item.hash === hash);
+
+    if (existingIndex >= 0) {
+      videoHistory[existingIndex].lastAccessed = Date.now();
+      videoHistory[existingIndex].accessCount = (videoHistory[existingIndex].accessCount || 0) + 1;
+
+      // 将最近访问的视频移到最前面
+      const item = videoHistory.splice(existingIndex, 1)[0];
+      videoHistory.unshift(item);
+
+      localStorage.setItem('videoHistoryList', JSON.stringify(videoHistory.slice(0, 10)));
+    }
+  }
+}
+
+// 新增函数：获取指定视频的AI聊天记录
+export function getChatMessagesForVideo(hash: string): ChatMessage[] {
+  const history = JSON.parse(localStorage.getItem('videoHashHistory') || '{}');
+  return history[hash]?.chatMessages || [];
+}
+
+// 新增函数：清除指定视频的AI聊天记录
+export function clearChatMessagesForVideo(hash: string) {
+  const history = JSON.parse(localStorage.getItem('videoHashHistory') || '{}');
+
+  if (history[hash]) {
+    history[hash].chatMessages = [];
+    localStorage.setItem('videoHashHistory', JSON.stringify(history));
+    return true;
+  }
+
+  return false;
+}
+
+// 新增函数：保存示例聊天记录
+export function saveExampleChatMessages(messages: ChatMessage[]) {
+  localStorage.setItem('exampleChatMessages', JSON.stringify(messages));
+}
+
+// 新增函数：获取示例聊天记录
+export function getExampleChatMessages(): ChatMessage[] {
+  try {
+    const stored = localStorage.getItem('exampleChatMessages');
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('获取示例聊天记录失败:', error);
+    return [];
+  }
+}
+
+// 新增函数：添加消息到示例聊天记录
+export function addMessageToExampleChat(message: ChatMessage) {
+  const currentMessages = getExampleChatMessages();
+  const newMessages = [...currentMessages, message];
+  saveExampleChatMessages(newMessages);
+  return newMessages;
+}
+
+// 新增函数：更新示例聊天记录
+export function updateExampleChatMessages(messages: ChatMessage[]) {
+  saveExampleChatMessages(messages);
+}
+
+// 新增函数：清除示例聊天记录
+export function clearExampleChatMessages() {
+  localStorage.removeItem('exampleChatMessages');
+}

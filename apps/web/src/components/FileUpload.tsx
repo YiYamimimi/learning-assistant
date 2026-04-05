@@ -1,7 +1,6 @@
 'use client';
 
-/* global sessionStorage */
-import { useToast } from '@/components/Toast';
+/* global localStorage */
 import { useRef, useState, useEffect } from 'react';
 import React from 'react';
 import { useRouter } from 'next/navigation';
@@ -12,6 +11,7 @@ import {
   saveVideoMetadata,
   generateSubtitleData,
   generateThemeData,
+  updateVideoHistory,
 } from '@/utils/fileHash';
 import { videoStorage } from '@/utils/videoStorage';
 
@@ -28,20 +28,22 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
   const [maxUsage] = useState(2);
   const router = useRouter();
 
+  const checkUsageStatus = async () => {
+    try {
+      const response = await fetch('/api/record-usage');
+      const data = await response.json();
+      setUsageCount(data.usageCount || 0);
+    } catch (error) {
+      console.error('检查使用状态失败:', error);
+    } finally {
+      setLoadingUsage(false);
+      console.log(loadingUsage, 'loadingUsage');
+    }
+  };
   useEffect(() => {
-    const checkUsageStatus = async () => {
-      try {
-        const response = await fetch('/api/record-usage');
-        const data = await response.json();
-        setUsageCount(data.usageCount || 0);
-      } catch (error) {
-        console.error('检查使用状态失败:', error);
-      } finally {
-        setLoadingUsage(false);
-      }
-    };
-
-    checkUsageStatus();
+    (async () => {
+      await checkUsageStatus();
+    })();
   }, []);
 
   const handleVideoUpload = async (e: React.ChangeEvent<globalThis.HTMLInputElement>) => {
@@ -55,75 +57,76 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
       try {
         const fileHash = await calculateFileHash(file);
         console.log('文件哈希值:', fileHash);
-
         const videoUrl = URL.createObjectURL(file);
-        sessionStorage.setItem('localVideoUrl', videoUrl);
-
+        // localStorage.setItem('localVideoUrl', videoUrl);
         const existingMetadata = isVideoUploaded(fileHash);
-
         if (existingMetadata) {
           console.log('文件已上传过，使用历史记录');
-
-          await videoStorage.saveVideo(fileHash, file);
-          sessionStorage.setItem('videoHash', fileHash);
-
+          // await videoStorage.getVideo(fileHash, file);
+          // localStorage.setItem('videoHash', fileHash);
           setTimeout(() => {
-            router.push(`/video?localVideo=true`);
+            router.push(`/video?localVideo=${videoUrl}`);
           }, 1500);
           return;
         }
-
         console.log('新文件，生成字幕和主题');
         const filenameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
 
-        let subtitleData, themeData;
+        let subtitleData: any, themeData;
 
         if (usageCount >= 2) {
           console.log('已达到使用次数限制，不生成字幕和主题');
           subtitleData = null;
           themeData = null;
+
+          setTimeout(() => {
+            router.push(`/video?localVideo=${videoUrl}&isExceed=true`);
+          }, 1500);
         } else {
           subtitleData = generateSubtitleData(filenameWithoutExt);
           themeData = generateThemeData();
-        }
+          console.log('字幕数据:', subtitleData);
+          console.log('主题数据:', themeData);
 
-        const metadata = {
-          filename: file.name,
-          size: file.size,
-          uploadedAt: Date.now(),
-          subtitleData,
-          themeData,
-          chatMessages: [],
-        };
-
-        if (usageCount < 2) {
+          // 创建完整的视频元数据
+          const metadata = {
+            filename: file.name,
+            size: file.size,
+            uploadedAt: Date.now(),
+            subtitleData,
+            themeData,
+            chatMessages: [],
+            lastAccessed: Date.now(),
+            accessCount: 0,
+          };
+          //localStorage
+          // 保存视频元数据到历史记录
           saveVideoMetadata(fileHash, metadata);
-        }
+          // 更新视频历史列表
+          updateVideoHistory(fileHash, metadata);
 
-        await videoStorage.saveVideo(fileHash, file);
-        sessionStorage.setItem('videoHash', fileHash);
+          // 设置当前活跃视频
+          localStorage.setItem('currentVideoHash', fileHash);
 
-        console.log('字幕数据:', subtitleData);
-        console.log('主题数据:', themeData);
-
-        try {
-          if (usageCount < 2) {
+          await videoStorage.saveVideo(fileHash, file);
+          try {
             await fetch('/api/record-usage', {
               method: 'POST',
             });
             console.log('用户使用情况已记录');
             setUsageCount((prev) => prev + 1);
-            sessionStorage.setItem('usageRecorded', 'true');
-          } else {
-            console.log('已达到使用次数限制，不记录使用情况');
+          } catch (usageError) {
+            console.error('记录用户使用情况失败:', usageError);
           }
-        } catch (usageError) {
-          console.error('记录用户使用情况失败:', usageError);
-        }
 
-        setTimeout(() => {
-          router.push(`/video?localVideo=true`);
-        }, 1500);
+          setTimeout(() => {
+            if (subtitleData) {
+              router.push(`/video?localVideo=${videoUrl}&fileHash=${fileHash}`);
+            } else {
+              router.push(`/video?localVideo=${videoUrl}&noData=true`);
+            }
+          }, 1500);
+        }
       } catch (error) {
         console.error('上传失败:', error);
         setUploadSuccess(false);
@@ -134,14 +137,9 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
   const handleTryNow = () => {
     window.location.href = '/video?example=true';
   };
-  const [flashBtn, setFlashBtn] = useState(false);
-  const { showToast } = useToast();
-  const chooseVideo=()=>{
-    showToast('上传视频正在升级，可以点击立即体验哦！', 'info');
-    setFlashBtn(true);
-    setTimeout(() => setFlashBtn(false), 3000);
-    videoInputRef.current?.click()
-  }
+  const chooseVideo = () => {
+    videoInputRef.current?.click();
+  };
 
   return (
     <div className="w-full max-w-2xl space-y-6">
@@ -214,21 +212,21 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
         <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg border border-purple-200">
           <div className="text-center">
             <h3 className="text-lg font-bold text-purple-900 mb-2">立即体验</h3>
-            <p className="text-sm text-purple-700 mb-2">使用示例内容快速体验 LongCut 的强大功能</p>
-        
+            <p className="text-sm text-purple-700 mb-2">
+              使用示例内容快速体验 AI辅助学习助手 的强大功能
+            </p>
+
             <button
               onClick={handleTryNow}
-              disabled={loadingUsage}
+              disabled={uploadSuccess}
               className={`px-8 py-3 bg-gradient-to-r text-white rounded-lg transition-all shadow-md font-semibold text-lg flex items-center justify-center mx-auto ${
-                loadingUsage
+                uploadSuccess
                   ? 'from-gray-400 to-gray-500 cursor-not-allowed'
-                  : flashBtn
-                    ? 'from-purple-500 to-pink-500 animate-pulse-ring'
-                    : 'from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600'
+                  : 'from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600'
               }`}
             >
               <Play className="h-5 w-5 mr-2" />
-              {loadingUsage ? '加载中...' : '开始体验'}
+              {uploadSuccess ? '正在上传视频……' : '开始体验'}
             </button>
           </div>
         </div>

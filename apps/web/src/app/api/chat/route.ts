@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import {
-  getGuestAccessState,
-  getAiUsageCount,
-  recordAiUsage,
-} from '@/lib/guest-usage';
+import { getGuestAccessState, getAiUsageCount } from '@/lib/guest-usage';
 
 const AI_USAGE_LIMIT = 3;
 
@@ -174,13 +170,13 @@ export async function POST(request: NextRequest) {
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
-          
-          // 记录AI聊天使用次数
-           try {
-             await recordAiUsage(guestState.identifiers);
-           } catch (error) {
-             console.error('记录AI聊天使用次数失败:', error);
-           }
+
+          // // 记录AI聊天使用次数
+          //  try {
+          //    await recordAiUsage(guestState.identifiers);
+          //  } catch (error) {
+          //    console.error('记录AI聊天使用次数失败:', error);
+          //  }
         } catch (error) {
           console.error('Stream error:', error);
           controller.error(error);

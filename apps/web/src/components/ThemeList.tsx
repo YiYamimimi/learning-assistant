@@ -25,17 +25,19 @@ interface ThemeListProps {
   themes?: VideoTheme[];
   usageLimitReached?: boolean;
   usageCount?: number;
+  isExceed: boolean;
+  isData: boolean;
 }
 
 export default function ThemeList({
   currentTime,
   videoDuration,
   onSeekTime,
-  themes: externalThemes,
-  usageLimitReached,
+  themes,
   usageCount,
+  isData,
+  isExceed,
 }: ThemeListProps) {
-  const [themes] = useState<VideoTheme[]>(externalThemes || []);
   const [isLoading] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -150,8 +152,6 @@ export default function ThemeList({
     );
   }
 
-
-
   // Use video duration if available, otherwise fall back to calculated total time
   const effectiveTotalTime = videoDuration;
   const timeMarkers = generateTimeMarkers(effectiveTotalTime, containerWidth);
@@ -184,7 +184,7 @@ export default function ThemeList({
         ></div>
 
         {/* Theme color blocks */}
-        {themes.map((theme, index) => {
+        {themes?.map((theme, index) => {
           const { start, end } = parseTimestamp(theme.quote.timestamp);
           const duration = end - start;
           const startPercent = effectiveTotalTime > 0 ? (start / effectiveTotalTime) * 100 : 0;
@@ -206,44 +206,52 @@ export default function ThemeList({
       </div>
 
       {/* Theme list */}
-      {(usageLimitReached && themes.length === 0) ? (<div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="text-2xl mb-2">⚠️</div>
-          <p className="font-medium text-orange-700">已超出使用次数，请登录</p>
-          <p className="text-sm text-gray-400">已使用 {usageCount}/2 次</p>
+      {isExceed || !isData ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="text-2xl mb-2">⚠️</div>
+            <p className="font-medium text-orange-700">
+              {isExceed ? `已超出使用次数，请登录` : '暂无数据'}
+            </p>
+            {isExceed && <p className="text-sm text-gray-400">已使用 {usageCount}/2 次</p>}
+          </div>
         </div>
-      </div>) : (<div className="flex-1 overflow-auto">
-        <div className="space-y-1">
-          {themes.length > 0 ?
-           (themes.map((theme, index) => {
-            const { start } = parseTimestamp(theme.quote.timestamp);
-            return (
-              <div
-                key={theme.id}
-                className="p-3 rounded-lg cursor-pointer hover:shadow-sm transition-shadow hover:cursor-pointer"
-                style={{ backgroundColor: getBackgroundColor(index) }}
-                onClick={() => handleThemeClick(start, theme.quote.timestamp)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div
-                      className="w-3 h-3 rounded-full mr-3"
-                      style={{ backgroundColor: getDotColor(index) }}
-                    ></div>
-                    <div className="flex-1">
-                      <div className="font-medium text-sm text-gray-900">{theme.title}</div>
+      ) : (
+        <div className="flex-1 overflow-auto">
+          <div className="space-y-1">
+            {themes && themes.length > 0 ? (
+              themes.map((theme, index) => {
+                const { start } = parseTimestamp(theme.quote.timestamp);
+                return (
+                  <div
+                    key={theme.id}
+                    className="p-3 rounded-lg cursor-pointer hover:shadow-sm transition-shadow hover:cursor-pointer"
+                    style={{ backgroundColor: getBackgroundColor(index) }}
+                    onClick={() => handleThemeClick(start, theme.quote.timestamp)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div
+                          className="w-3 h-3 rounded-full mr-3"
+                          style={{ backgroundColor: getDotColor(index) }}
+                        ></div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm text-gray-900">{theme.title}</div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-600">{formatTime(start)}</div>
                     </div>
                   </div>
-                  <div className="text-xs text-gray-600">{formatTime(start)}</div>
-                </div>
+                );
+              })
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                暂无主题
               </div>
-            );
-          })) : 
-          (<div className="flex items-center justify-center h-full text-gray-400 text-sm">暂无主题</div>
-          )}
-
+            )}
+          </div>
         </div>
-      </div>)}
+      )}
     </div>
   );
 }
