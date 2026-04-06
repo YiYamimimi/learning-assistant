@@ -25,7 +25,7 @@ interface ThemeListProps {
   themes?: VideoTheme[];
   usageLimitReached?: boolean;
   usageCount?: number;
-  isExceed: boolean;
+  isExceed: any;
   isData: boolean;
 }
 
@@ -34,9 +34,6 @@ export default function ThemeList({
   videoDuration,
   onSeekTime,
   themes,
-  usageCount,
-  isData,
-  isExceed,
 }: ThemeListProps) {
   const [isLoading] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -206,7 +203,7 @@ export default function ThemeList({
       </div>
 
       {/* Theme list */}
-      {isExceed || !isData ? (
+      {/* {isExceed || !isData ? (
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <div className="text-2xl mb-2">⚠️</div>
@@ -216,42 +213,44 @@ export default function ThemeList({
             {isExceed && <p className="text-sm text-gray-400">已使用 {usageCount}/2 次</p>}
           </div>
         </div>
-      ) : (
-        <div className="flex-1 overflow-auto">
-          <div className="space-y-1">
-            {themes && themes.length > 0 ? (
-              themes.map((theme, index) => {
-                const { start } = parseTimestamp(theme.quote.timestamp);
-                return (
-                  <div
-                    key={theme.id}
-                    className="p-3 rounded-lg cursor-pointer hover:shadow-sm transition-shadow hover:cursor-pointer"
-                    style={{ backgroundColor: getBackgroundColor(index) }}
-                    onClick={() => handleThemeClick(start, theme.quote.timestamp)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div
-                          className="w-3 h-3 rounded-full mr-3"
-                          style={{ backgroundColor: getDotColor(index) }}
-                        ></div>
-                        <div className="flex-1">
-                          <div className="font-medium text-sm text-gray-900">{theme.title}</div>
-                        </div>
+      ) : ( */}
+      <div className="flex-1 overflow-auto">
+        <div className="space-y-1">
+          {themes && themes.length > 0 ? (
+            themes.map((theme, index) => {
+              const { start } = parseTimestamp(theme.quote.timestamp);
+              return (
+                <div
+                  key={theme.id}
+                  className="p-3 rounded-lg cursor-pointer hover:shadow-sm transition-shadow hover:cursor-pointer"
+                  style={{ backgroundColor: getBackgroundColor(index) }}
+                  onClick={() => handleThemeClick(start, theme.quote.timestamp)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div
+                        className="w-3 h-3 rounded-full mr-3"
+                        style={{ backgroundColor: getDotColor(index) }}
+                      ></div>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-gray-900">{theme.title}</div>
                       </div>
-                      <div className="text-xs text-gray-600">{formatTime(start)}</div>
                     </div>
+                    <div className="text-xs text-gray-600">{formatTime(start)}</div>
                   </div>
-                );
-              })
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                暂无主题
-              </div>
-            )}
-          </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full py-8">
+              <div className="text-4xl mb-3 text-gray-300">📚</div>
+              <div className="text-gray-500 text-sm font-medium">暂无主题</div>
+              <div className="text-gray-400 text-xs mt-1">生成字幕后即可生成主题</div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+      {/* )} */}
     </div>
   );
 }

@@ -9,8 +9,6 @@ import {
   calculateFileHash,
   isVideoUploaded,
   saveVideoMetadata,
-  generateSubtitleData,
-  generateThemeData,
   updateVideoHistory,
 } from '@/utils/fileHash';
 import { videoStorage } from '@/utils/videoStorage';
@@ -25,7 +23,6 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [loadingUsage, setLoadingUsage] = useState(true);
   const [usageCount, setUsageCount] = useState(0);
-  const [maxUsage] = useState(2);
   const router = useRouter();
 
   const checkUsageStatus = async () => {
@@ -65,14 +62,15 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
           // await videoStorage.getVideo(fileHash, file);
           // localStorage.setItem('videoHash', fileHash);
           setTimeout(() => {
-            router.push(`/video?localVideo=${videoUrl}`);
+            router.push(
+              `/video?localVideo=${videoUrl}&type='hash'&fileHash=${fileHash}&isExceed=${usageCount >= 2}`
+            );
           }, 1500);
           return;
         }
         console.log('新文件，生成字幕和主题');
-        const filenameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
 
-        let subtitleData: any, themeData;
+        let subtitleData: any, themeData: any;
 
         if (usageCount >= 2) {
           console.log('已达到使用次数限制，不生成字幕和主题');
@@ -80,11 +78,15 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
           themeData = null;
 
           setTimeout(() => {
-            router.push(`/video?localVideo=${videoUrl}&isExceed=true`);
+            router.push(
+              `/video?localVideo=${videoUrl}&type='temporary&isExceed=${usageCount >= 2}&fileHash=''`
+            );
           }, 1500);
         } else {
-          subtitleData = generateSubtitleData(filenameWithoutExt);
-          themeData = generateThemeData();
+          // subtitleData = generateSubtitleData(filenameWithoutExt);
+          // themeData = generateThemeData();
+          subtitleData = [];
+          themeData = [];
           console.log('字幕数据:', subtitleData);
           console.log('主题数据:', themeData);
 
@@ -118,14 +120,9 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
           } catch (usageError) {
             console.error('记录用户使用情况失败:', usageError);
           }
-
-          setTimeout(() => {
-            if (subtitleData) {
-              router.push(`/video?localVideo=${videoUrl}&fileHash=${fileHash}`);
-            } else {
-              router.push(`/video?localVideo=${videoUrl}&noData=true`);
-            }
-          }, 1500);
+          router.push(
+            `/video?localVideo=${videoUrl}&fileHash=${fileHash}&type='hash'&&isExceed=${usageCount >= 2}`
+          );
         }
       } catch (error) {
         console.error('上传失败:', error);
@@ -135,7 +132,7 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
   };
 
   const handleTryNow = () => {
-    window.location.href = '/video?example=true';
+    router.push(`/video?type=example&isExceed=${usageCount >= 2}&fileHash=''`);
   };
   const chooseVideo = () => {
     videoInputRef.current?.click();
@@ -171,11 +168,11 @@ export default function FileUpload({ onVideoUpload, videoFile }: FileUploadProps
                 <p className="text-sm text-gray-600 mb-2">点击或拖拽上传视频文件</p>
                 <p className="text-xs text-gray-400">支持mp3、mp4、wav、ogg格式</p>
                 <p className="text-xs text-gray-400">音频应该小于 500MB，且时长小于 3 小时</p>
-                {!loadingUsage && (
+                {/* {!loadingUsage && (
                   <p className="text-xs text-purple-600 m-4">
                     已使用 {usageCount}/{maxUsage} 次
                   </p>
-                )}
+                )} */}
                 <input
                   ref={videoInputRef}
                   type="file"

@@ -8,7 +8,7 @@ import { useToast } from './Toast';
 interface HistoryPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectHistory: (hash: string, filename: string, videoUrl: string) => void;
+  onSelectHistory: (hash: string, videoUrl: string) => void;
   currentVideoHash?: string;
 }
 
@@ -30,7 +30,7 @@ export default function HistoryPanel({
     }
   }, [isOpen]);
 
-  const handleHistoryClick = async (hash: string, filename: string) => {
+  const handleHistoryClick = async (hash: string) => {
     setLoading(true);
     setLoadingHash(hash);
 
@@ -38,7 +38,7 @@ export default function HistoryPanel({
       const video = await videoStorage.getVideo(hash);
       if (video) {
         const videoUrl = URL.createObjectURL(video);
-        onSelectHistory(hash, filename, videoUrl);
+        onSelectHistory(hash, videoUrl);
       } else {
         showToast('视频文件未找到，请重新上传', 'error');
       }
@@ -126,7 +126,7 @@ export default function HistoryPanel({
                 {history.map((item) => (
                   <button
                     key={item.hash}
-                    onClick={() => handleHistoryClick(item.hash, item.filename)}
+                    onClick={() => handleHistoryClick(item.hash)}
                     disabled={loading}
                     className={`w-full text-left p-4 rounded-lg border transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed ${
                       currentVideoHash === item.hash

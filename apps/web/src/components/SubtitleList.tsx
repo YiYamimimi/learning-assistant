@@ -21,7 +21,7 @@ export default function SubtitleList({ subtitleData }: SubtitleListProps) {
 
   return (
     <div className=" overflow-y-auto">
-      {subtitleData && Array.isArray(subtitleData) ? (
+      {subtitleData && Array.isArray(subtitleData) && subtitleData.length > 0 ? (
         <div className="space-y-2">
           {subtitleData.map((subtitle: any, index: number) => (
             <div
@@ -37,7 +37,14 @@ export default function SubtitleList({ subtitleData }: SubtitleListProps) {
           ))}
         </div>
       ) : (
-        <div className="flex h-full items-center justify-center text-gray-500">暂无字幕数据</div>
+        <div className="flex flex-col h-full items-center justify-center py-12 px-4">
+          <div className="text-5xl mb-4 text-blue-200">🎙️</div>
+          <div className="text-center">
+            <div className="text-gray-600  font-medium text-lg mb-2">字幕识别功能升级中</div>
+            <div className="text-gray-500 text-sm">功能正在优化，即将为您带来更精准的字幕体验</div>
+            <div className="text-gray-400 text-xs mt-3">敬请期待！</div>
+          </div>
+        </div>
       )}
     </div>
   );
