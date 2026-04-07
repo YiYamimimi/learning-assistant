@@ -169,8 +169,8 @@ const SYNONYMS: Record<string, string[]> = {
   云端: ['cloud', 'remote'],
   本地: ['local', 'on-premise'],
   实时: ['real-time', 'live', 'instant'],
-  异步: 'async',
-  同步: 'sync',
+  异步: ['async'],
+  同步: ['sync'],
 };
 
 export interface Message {
@@ -323,7 +323,7 @@ export async function findSimilarMessages(
   const similarities = messages.map((message, i) => {
     const messageTF = computeTF(messageTokensList[i]);
     const messageVector = tfidfToVector(messageTF, idf, allTokensArray);
-    const similarity = cosineSimilarity(queryVector, messageVector);
+    const similarity = cosineSimilarity(Array.from(queryVector), Array.from(messageVector));
 
     return {
       message,

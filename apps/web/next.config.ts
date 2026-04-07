@@ -1,8 +1,10 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
   reactCompiler: true,
+  turbopack: {
+    root: '../..',
+  },
   async headers() {
     return [
       {
@@ -17,7 +19,12 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
-    domains: ['i0.hdslb.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'i0.hdslb.com',
+      },
+    ],
   },
 };
 

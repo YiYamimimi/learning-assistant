@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "My Extension",
+  "name": "AI辅助学习助手",
   "version": "1.0.0",
   "description": "A Chrome extension built with React and Vite",
   "permissions": ["sidePanel", "tabs", "webRequest", "storage", "https://*/*"],

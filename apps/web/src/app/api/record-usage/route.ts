@@ -15,14 +15,10 @@ export async function POST(_request: NextRequest) {
       usageCount: state.usageCount,
       identifiers: state.identifiers,
     });
-
     await recordGuestUsage(state);
-
     const newUsageCount = state.usageCount + 1;
     const isLimitReached = newUsageCount >= 2;
-
     console.log('记录完成，新的使用次数:', newUsageCount);
-
     const response = NextResponse.json({
       success: true,
       message: 'Usage recorded',
@@ -30,9 +26,7 @@ export async function POST(_request: NextRequest) {
       maxUsage: 2,
       used: isLimitReached,
     });
-
     setGuestCookies(response, state, { markUsed: isLimitReached });
-
     console.log('=== 记录使用情况完成 ===');
     return response;
   } catch (error) {

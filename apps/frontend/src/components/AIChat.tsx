@@ -42,7 +42,6 @@ export function AIChat() {
 
       if (response.success) {
         const { relevantChunks: chunks, context } = response.data;
-        setRelevantChunks(chunks);
         console.log('相关字幕:', chunks);
         console.log('上下文:', context);
       } else {

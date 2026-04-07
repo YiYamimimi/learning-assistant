@@ -15,6 +15,7 @@ export type GuestAccessState = {
   used: boolean;
   usageCount: number;
   identifiers: string[];
+  token: string;
 };
 
 async function getIpHash(): Promise<string | null> {
@@ -55,7 +56,7 @@ export async function getGuestAccessState(options?: {
   const usedCookie = cookieStore.get(GUEST_USED_COOKIE)?.value === '1';
   let used = usedCookie;
   let usageCount = 0;
-  
+
   const rateKey = options?.key || GUEST_RATE_KEY;
   const maxUsage = options?.maxUsage || MAX_USAGE_COUNT;
 
@@ -71,11 +72,11 @@ export async function getGuestAccessState(options?: {
   }
 
   if (data && data.length > 0) {
-      usageCount = Math.max(...data.map((item) => item.usage_count || 0));
-      if (!used) {
-        used = usageCount >= maxUsage;
-      }
+    usageCount = Math.max(...data.map((item) => item.usage_count || 0));
+    if (!used) {
+      used = usageCount >= maxUsage;
     }
+  }
 
   return {
     token,
@@ -125,7 +126,7 @@ export async function recordGuestUsage(
   for (const identifier of uniqueIdentifiers) {
     console.log(`处理标识符: ${identifier}`);
 
-    const { data, error } = await supabase.rpc('increment_usage_count', {
+    const { data, error } = await (supabase as any).rpc('increment_usage_count', {
       p_key: options?.key || GUEST_RATE_KEY,
       p_identifier: identifier,
     });
@@ -183,7 +184,7 @@ export async function updateUsageCount(
       `更新记录: ${record.identifier}, usage_count: ${record.usage_count} -> ${newCount}`
     );
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (supabase as any)
       .from('rate_limits')
       .update({
         usage_count: newCount,
@@ -276,7 +277,7 @@ export async function recordAiUsage(
 
     if (existing) {
       newCount = (existing.use_ai || 0) + 1;
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('rate_limits')
         .update({ use_ai: newCount, timestamp: new Date().toISOString() })
         .eq('key', GUEST_RATE_KEY)
@@ -288,15 +289,13 @@ export async function recordAiUsage(
       }
     } else {
       newCount = 1;
-      const { error: insertError } = await supabase
-        .from('rate_limits')
-        .insert({
-          key: GUEST_RATE_KEY,
-          identifier,
-          usage_count: 0,
-          use_ai: 1,
-          timestamp: new Date().toISOString(),
-        });
+      const { error: insertError } = await (supabase as any).from('rate_limits').insert({
+        key: GUEST_RATE_KEY,
+        identifier,
+        usage_count: 0,
+        use_ai: 1,
+        timestamp: new Date().toISOString(),
+      });
 
       if (insertError) {
         console.error('Failed to insert use_ai:', insertError);

@@ -402,9 +402,9 @@ export function createDanmakuPanel() {
   const createPanel = async () => {
     try {
       console.log('开始等待页面元素加载...');
-      await waitForElement('.danmaku-box', 10000);
-      await waitForElement('.danmaku-wrap', 10000);
-      await waitForElement('video', 10000);
+      await waitForElement('.danmaku-box');
+      await waitForElement('.danmaku-wrap');
+      await waitForElement('video');
 
       const danmukuBox = document.querySelector('.danmaku-box');
       const danmakuWrap = document.querySelector('.danmaku-wrap');

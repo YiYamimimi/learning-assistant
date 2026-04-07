@@ -199,6 +199,7 @@ chrome.webRequest.onBeforeRequest.addListener(
     if (details.url.includes('https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod')) {
       console.log('拦截到字幕接口请求 (background):', details.url);
     }
+    return {};
   },
   {
     urls: ['<all_urls>'],

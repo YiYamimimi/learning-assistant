@@ -7,9 +7,9 @@ import { VideoTheme } from './services/themeService';
 import { MarkdownWithTimestamps } from './components/MarkdownWithTimestamps';
 
 const PRESET_QUESTIONS = [
-  '这个视频讲了什么?',
   '这个视频的主要观点是什么?',
-  'How does pair programming apply to AI coding?',
+  '这个视频有哪些精彩片段?',
+  '这个视频中最精彩的语录是什么?',
 ];
 
 export default function App() {
@@ -100,7 +100,7 @@ export default function App() {
       console.log(userMessage, messages, 'userMessage, messages');
       console.log('字幕数量:', subtitles.length, '主题数量:', themes.length);
 
-      for await (const chunk of streamChat(userMessage, messages, subtitles, themes)) {
+      for await (const chunk of streamChat(userMessage, messages, subtitles)) {
         fullResponse = chunk.answer;
         setMessages((prev) => [
           ...prev.slice(0, -1),
