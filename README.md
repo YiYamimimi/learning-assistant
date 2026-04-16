@@ -1,8 +1,11 @@
 ```
 我们在观看长视频时，比如会谈、讲座等，可能会有几个小时，这时直接将视频丢给AI做总结，会失去视频本身的视觉信息。为了解决这个痛点，我用AI 开发了一个AI视频助手！
 ```
+插件版：https://github.com/YiYamimimi/Chrome-extension
 
 把要观看的视频上传，它会帮你生成字幕，以及核心主题，点击可跳转到对应的播放位置；侧边的AI聊天提供了带时间戳的实时问答，辅助观看视频和高效吸收视频信息。
+
+
 
 
  <img width="1117" height="719" alt="image" src="https://github.com/user-attachments/assets/63a5530e-4e93-47cd-9b4e-30acb2151624" />
